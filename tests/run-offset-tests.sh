@@ -207,7 +207,10 @@ get() { echo "$RAW" | LC_ALL=C awk -F'\t' -v k="$1" '$1 == k {print $2}'; }
 # = 136.20; owed = 136.20 minus every dollar contributed (offsets $16 + $3 + $8
 # and the $10.00 donation = $37.00) = 99.20. No kg translation, no clamp —
 # owed goes NEGATIVE past carbon-neutral. Only verified removal settles tonnes.
-# Line 3: paid-off vs emitted in tonnes (100 kg verified removal / 600 kg).
+# Line 3: OUTSTANDING vs emitted in tonnes, counting down in step with line 2 —
+# 600 kg emitted minus 100 kg verified removal = 500 kg still to remove, over
+# 600 kg emitted. The $10 donation and the unverified 50 kg move neither number:
+# donations settle dollars, and a purchase without a receipt settles nothing.
 CACHE_L1="$(sed -n 1p "${STATE}/segment-cache" 2>/dev/null)"
 CACHE_L2="$(sed -n 2p "${STATE}/segment-cache" 2>/dev/null)"
 CACHE_L3="$(sed -n 3p "${STATE}/segment-cache" 2>/dev/null)"
@@ -221,10 +224,10 @@ if [ "$CACHE_L2" = "99.20/136.20" ]; then
 else
   ko "segment cache owed/overall pair nets out all contributed dollars (got: '$CACHE_L2')"
 fi
-if [ "$CACHE_L3" = "💨 0.10t/0.60t" ]; then
-  ok "segment cache carries paid-off/emitted on its own line"
+if [ "$CACHE_L3" = "💨 0.50t/0.60t" ]; then
+  ok "segment cache carries outstanding/emitted on its own line (0.50t left of 0.60t)"
 else
-  ko "segment cache carries paid-off/emitted on its own line (got: '$CACHE_L3')"
+  ko "segment cache carries outstanding/emitted on its own line (got: '$CACHE_L3')"
 fi
 
 # going past carbon-neutral in dollars leaves owed NEGATIVE, not clamped at 0:
@@ -265,6 +268,25 @@ grep -c '^[0-9]' "$CSV_ACME" | grep -qx "2" && ok "export row count (2 rows for 
 
 bash "$EXPORT" --tax-year 2025 >/dev/null 2>&1 || ko "export 2025 exits 0"
 [ -f "${STATE}/exports/tax-2025-example-media-co.csv" ] && ok "2025 export has the year-boundary row" || ko "2025 export has the year-boundary row"
+
+# --- 7. tonnes outstanding goes negative past carbon-neutral ----------------
+# The mirror of the owed test above, and the reason it exists: line 3 counts
+# DOWN like line 2, so buying more verified removal than you emitted has to push
+# it below zero rather than clamp at 0.00t. Clamping would render an over-
+# removed ledger identically to an exactly-settled one, which is precisely the
+# case worth showing. Runs last because it moves the ledger past neutral and the
+# export assertions above depend on the row set as it stood.
+# 700 kg more verified removal -> 800 kg removed against 600 kg emitted
+# -> -200 kg outstanding -> -0.20t.
+bash "$RECORD" --kg 700 --usd 158.90 --vendor remove-carbon-today --pathway biochar \
+  --category removal --payer "Acme Research LLC" --receipt "$RECEIPT1" \
+  --date 2026-08-01 >/dev/null 2>&1 || ko "over-removing purchase exits 0"
+CACHE_L3_NEG="$(sed -n 3p "${STATE}/segment-cache" 2>/dev/null)"
+if [ "$CACHE_L3_NEG" = "💨 -0.20t/0.60t" ]; then
+  ok "tonnes outstanding goes negative past carbon-neutral (-0.20t/0.60t)"
+else
+  ko "tonnes outstanding goes negative past carbon-neutral (got: '$CACHE_L3_NEG')"
+fi
 
 echo ""
 if [ "$FAILED" -gt 0 ]; then

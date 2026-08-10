@@ -46,7 +46,7 @@ emit_factors_env "${REPO_DIR}/data/factors.json" "$STATE" || {
   echo "FAIL statusline: emit_factors_env failed" >&2
   exit 1
 }
-printf '∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t\n99.79/99.79\n💨 0.00t/0.62t' >"${STATE}/segment-cache"
+printf '∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t\n99.79/99.79\n💨 0.62t/0.62t' >"${STATE}/segment-cache"
 
 # --- factors.env is a cache, and a cache needs invalidating ------------------
 # This is a regression test for a bug that shipped: the removal price moved from
@@ -121,7 +121,7 @@ check_vector() {
   # SESSION FIGURES ABOVE THE RULE, TOTALS BELOW IT. The session cost sits with
   # the session readings it was computed from; the totals line carries only
   # all-time figures.
-  want="$(printf '%s · ▲ %s\n%s\n∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t · 💨 0.00t/0.62t · $99.79/99.79 total' \
+  want="$(printf '%s · ▲ %s\n%s\n∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t · 💨 0.62t/0.62t · $99.79/99.79 owed' \
     "$exp_fmt" "$exp_cost" "$SEP_LINE")"
   if [ "$got" = "$want" ]; then
     echo "PASS statusline math: ${vid}"

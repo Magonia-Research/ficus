@@ -9,8 +9,21 @@
 #      overall minus every dollar contributed (all offset purchases + all
 #      donations, 1:1, no kg translation). Unclamped: owed goes NEGATIVE once
 #      contributions pass carbon-neutral
-#   3: "💨 <paid>t/<emitted>t" — verified removal purchased vs total emitted,
+#   3: "💨 <outstanding>t/<emitted>t" — tonnes still to remove vs total emitted,
 #      rendered on the totals line beneath the separator
+#
+# BOTH PAIRS COUNT DOWN, and that is the whole point of line 3's shape. It used
+# to read <paid>/<emitted> — removal purchased, counting UP toward the
+# denominator — directly beside a dollar pair counting DOWN toward zero. Two
+# numerators in identical x/y syntax, moving in opposite directions, one of them
+# disagreeing with `balance_kg` in the dashboard and "Unoffset balance" in
+# carbon-review.sh, which have always counted down. The statusline was the lone
+# outlier; now the numerator is what is left to settle in both, in tonnes and in
+# dollars, and the denominator is the whole job in both.
+#
+# Unclamped for the same reason owed is: buying more verified removal than you
+# emitted drives it NEGATIVE, and clamping at zero would erase the achievement
+# exactly where it is worth showing.
 # The statusline render path only ever reads this file; all DB work happens
 # here, at write time (Stop hook, backfill, recompute, offset recording).
 #
@@ -46,7 +59,8 @@ refresh_segment_cache() {
 
   local bal
   bal="$(sqlite3 "$db" "SELECT printf('💨 %.2ft/%.2ft',
-      (SELECT COALESCE(SUM(kg_co2e),0) FROM offsets WHERE category='removal' AND verified=1) / 1000.0,
+      (SELECT COALESCE(SUM(co2_grams),0)/1000000.0 FROM sessions WHERE COALESCE(excluded,0)=0)
+      - (SELECT COALESCE(SUM(kg_co2e),0) FROM offsets WHERE category='removal' AND verified=1) / 1000.0,
       (SELECT COALESCE(SUM(co2_grams),0)/1000000.0 FROM sessions WHERE COALESCE(excluded,0)=0)
     );" 2>/dev/null)" || bal=""
 
