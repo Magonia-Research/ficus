@@ -56,6 +56,22 @@ The statusline segment is opt-in and merges into your own
 walks through it; `statusline-snippet.sh` at the repo root is the reference
 implementation.
 
+![A terminal statusline. The left side shows the model Opus 5, the project carbon-ledger, the branch main, a context bar at 22 percent, $14.15, 36 minutes 38 seconds elapsed and a 99 percent cache rate. Right of a vertical rule, a carbon column shows all-time totals of 2268.8 kilowatt-hours, 11952 litres and 0.65 tonnes, then 0.00 tonnes removed of 0.65 emitted and $147.81 of $147.81 still owed. A full-width row underneath shows this session: 60.35 watt-hours, 317.9 millilitres, 17.32 grams and 0.39 cents.](docs/statusline.png)
+
+Right of the rule, read from the ledger: `∑ ⚡` all-time electricity, `💧` water,
+`💨` CO2e; then `💨 removed/emitted` tonnes and `$owed/total` to clear the
+balance at the removal price. The row underneath is this conversation only,
+recomputed on every repaint: energy, water, CO2e, and `▲` what removing it would
+cost (in cents below a dollar). Everything left of the rule is Claude Code's own
+status JSON, including that first dollar figure — it is the price of the tokens,
+not the price of removing their carbon.
+
+That session row is the roughest number on the screen by design: it reads
+`context_window` rather than parsing the transcript, so it counts cache reads as
+ordinary input and never sees subagent tokens. The ledger deduplicates properly,
+and when the two disagree the ledger is right. Every value is broken down on the
+[documentation site](https://magonia-research.github.io/ficus/#statusline).
+
 State lives in `~/.claude/carbon-ledger/` (database, receipts, exports,
 dashboards). `CARBON_LEDGER_DB` overrides the database path and everything else
 is derived from it, which is how the tests run against throwaway sandboxes.

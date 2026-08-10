@@ -11,6 +11,12 @@ bottom (directly above Claude Code's mode line):
 ⚡ 0.42Wh 💧 2.2mL 💨 0.12g · ▲ 0.03¢
 ```
 
+This page is about *wiring it in*. For what each figure counts and the formula
+behind it, value by value, see
+[What the statusline shows](https://magonia-research.github.io/ficus/#statusline)
+on the documentation site — it is generated from the same constants files the
+statusline reads, so it cannot drift from the numbers on your screen.
+
 **The column carries no header row.** A `Totals:` label above it cost a full
 blank line across the left half of the statusline to say what the `∑` prefix
 and the trailing `total` already say. Three rows, no gap.

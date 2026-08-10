@@ -246,6 +246,7 @@ footer p { margin: 0.4rem 0; max-width: 62rem; }
       <a href="#install">Install</a>
       <a href="#sources">Sources</a>
       <a href="#maths">Maths</a>
+      <a href="#statusline">Statusline</a>
       <a href="#giving">Giving</a>
       <a href="dashboard.html">Example</a>
     </nav>
@@ -466,6 +467,77 @@ cd ficus</code></pre>
       is a contribution, it is labelled as one, and it never touches the carbon balance.</p>
     <p class="note">Full derivations, including every rejected alternative, are in
       <a href="https://github.com/Magonia-Research/ficus/blob/main/METHODOLOGY.md">METHODOLOGY.md</a>.</p>
+  </section>
+
+  <!-- ========================== STATUSLINE =========================== -->
+  <section id="statusline">
+    <span class="eyebrow">Reading it</span>
+    <h2>What the statusline shows</h2>
+    <p class="sub">Every figure on the carbon rows, what it counts, and which line of the maths above
+      produced it. The left-hand side is Claude Code's own status JSON and is reproduced here only so
+      the screenshot reads in one piece — this project does not compute it.</p>
+    <div class="hr"></div>
+
+    <figure class="shot">
+      <img src="statusline.png" alt="A terminal statusline. Top left: the model name Opus 5, a folder icon with the project name carbon-ledger, and a branch icon with main. Second row left: a context-usage bar at 22 percent, a session cost of $14.15, an elapsed time of 36 minutes 38 seconds, and a cache hit rate of 99 percent. A vertical rule separates a right-hand carbon column: all-time totals of 2268.8 kilowatt-hours, 11952 litres and 0.65 tonnes on the first row, and 0.00 tonnes removed of 0.65 tonnes emitted with $147.81 of $147.81 still owed on the second. A full-width row underneath shows this session: 60.35 watt-hours, 317.9 millilitres, 17.32 grams, and an offset cost of 0.39 cents.">
+      <figcaption>The carbon column sits to the right of whatever statusline you already run; the
+        session row sits underneath it, directly above Claude Code's mode line.</figcaption>
+    </figure>
+
+    <div class="panel">
+      <h3 style="margin-top:0">The lifetime column, right of the rule</h3>
+      <p class="note">Read out of the ledger database, not recomputed at render time. These are sums
+        over every session ever recorded, which is why they only move when a session ends.</p>
+      <div class="tw" tabindex="0">
+      <table>
+        <caption>All-time totals and the settlement pair.</caption>
+        <thead><tr><th>Shown</th><th>What it counts</th><th>How it is calculated</th></tr></thead>
+        <tbody>
+          <tr><th scope="row" class="n">∑ ⚡ 2268.8kWh</th><td>Every watt-hour of datacenter electricity attributed to this account's usage, for all time.</td><td class="src">Sum of <code>energy_wh</code> across all session rows, each <span class="n">energy_wh = co2_g / 0.287</span>.</td></tr>
+          <tr><th scope="row" class="n">💧 11952L</th><td>Cooling and generation water for that electricity, both terms combined.</td><td class="src">Sum of <code>water_ml</code>, each <span class="n">water_ml = energy_wh × (0.18/1.14 + 5.11)</span>.</td></tr>
+          <tr><th scope="row" class="n">💨 0.65t</th><td>Operational CO2e for all time. Embodied carbon is <em>not</em> in this figure.</td><td class="src">Sum of <code>co2_grams</code>, each <span class="n">co2_g = ((input + cache_write) × f_in + cache_read × f_in × 0.08 + output × f_out) / 1e6</span>.</td></tr>
+          <tr><th scope="row" class="n">💨 0.00t/0.65t</th><td>Verified removal you have actually bought, over total emitted. The left number moves only when a receipt is recorded.</td><td class="src">Retired tonnes from the offsets ledger / the tonnes total above. Prevention credits never enter this pair.</td></tr>
+          <tr><th scope="row" class="n">$147.81/147.81 total</th><td>Dollars still owed to clear the balance, over what the whole balance would cost. Equal until something is bought.</td><td class="src">Unsettled tonnes × <span class="n">$227</span>/t, over emitted tonnes × the same rate.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">The session row, underneath</h3>
+      <p class="note">Computed live in the render path from the token counts Claude Code passes on
+        stdin. No database is opened to draw this row — that is a hard budget, because the statusline
+        runs on every keystroke-driven repaint.</p>
+      <div class="tw" tabindex="0">
+      <table>
+        <caption>This conversation only, recomputed on every repaint.</caption>
+        <thead><tr><th>Shown</th><th>What it counts</th><th>How it is calculated</th></tr></thead>
+        <tbody>
+          <tr><th scope="row" class="n">⚡ 60.35Wh</th><td>Electricity for this conversation so far.</td><td class="src"><span class="n">energy_wh = co2_g / 0.287</span>, at grid intensity <span class="n">0.287</span> g/Wh.</td></tr>
+          <tr><th scope="row" class="n">💧 317.9mL</th><td>Water for that electricity, on-site plus off-site.</td><td class="src"><span class="n">water_ml = energy_wh × (0.18/1.14 + 5.11)</span> — PUE <span class="n">1.14</span>, WUE <span class="n">0.18</span> on-site and <span class="n">5.11</span> off-site.</td></tr>
+          <tr><th scope="row" class="n">💨 17.32g</th><td>Operational CO2e for this conversation.</td><td class="src">Tokens × the per-model factors, <span class="n">co2_g = ((input + cache_write) × f_in + cache_read × f_in × 0.08 + output × f_out) / 1e6</span>.</td></tr>
+          <tr><th scope="row" class="n">▲ 0.39¢</th><td>What removing this session's carbon would cost at the price this project links to.</td><td class="src">Session grams × <span class="n">$227</span>/t. Shown in <strong>cents below a dollar</strong>: a whole cent is 44 g, so a dollars-and-cents figure would read $0.00 for the opening stretch of every session and then jump, which is indistinguishable from a figure that has stopped updating.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="note"><strong>The session row is the roughest number on the screen, by construction.</strong>
+        Claude Code does not break out cache-read tokens in the statusline payload, and parsing the
+        transcript on every repaint would blow the render budget — so this row reads
+        <code>context_window</code>, which is current context size: it counts cache reads as ordinary
+        input and does not see subagent tokens at all. The ledger, the dashboard and every report parse
+        the transcript properly and deduplicate. <strong>When the two disagree, the ledger is right.</strong></p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Not ours</h3>
+      <p class="note">Everything left of the vertical rule comes from Claude Code itself and is shown
+        for context only: the model name, the working directory, the git branch, the context-window bar
+        and its percentage, the elapsed session time, and the cache hit rate. The dollar figure on that
+        side is Claude Code's own session cost — it is a <em>price paid for tokens</em> and has nothing
+        to do with the <span class="n">▲</span> figure on the carbon row, which is a <em>price to
+        remove carbon</em>. Two dollar signs, two entirely different meanings, which is why they sit on
+        opposite sides of the rule.</p>
+    </div>
   </section>
 
   <!-- ============================ GIVING ============================= -->
