@@ -195,8 +195,7 @@ that argues against the carbon case for several of them.
 Ficus is a hardened fork of
 [claude-carbon](https://github.com/gwittebolle/claude-carbon) by Gaëtan
 Wittebolle (MIT), pinned at commit
-`43fb883ac1989d962c8699afb0be37fbe69c4476` (tag `upstream-43fb883`) after a
-line-by-line audit.
+`43fb883ac1989d962c8699afb0be37fbe69c4476` after a line-by-line audit.
 
 Kept from upstream: the transcript parser, the throttled backfill, the SQLite
 ledger of raw tokens, the Jegham-derived factors and price tracking, and the

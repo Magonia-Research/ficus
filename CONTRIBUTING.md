@@ -32,7 +32,7 @@ to the runner. The twelve:
 | Suite | What it holds |
 | --- | --- |
 | `run-vectors.sh` | Golden methodology vectors, including physics and model-family precedence |
-| `run-reconciliation.sh` | Parser output against the pinned `upstream-43fb883` tag |
+| `run-reconciliation.sh` | Parser output against the pinned upstream commit `43fb883` |
 | `run-physics-db.sh` | The three write paths that populate the derived columns |
 | `run-offset-tests.sh` | The offsets and donations ledger, receipts, export |
 | `run-crosscheck.sh` | EcoLogits cross-check, plus a mutation test proving the gate bites |
@@ -89,8 +89,9 @@ guard in `scripts/lib/factors-env.sh`, in that same commit.
 
 ## Fork rules
 
-The upstream remote is fetch-only. Files that exist in the `upstream-43fb883`
-tag stay **byte-close to upstream** so cherry-picks apply cleanly. Do not
+The upstream remote is fetch-only. Files listed in
+`tests/upstream-43fb883-files.txt` stay **byte-close to upstream** so
+cherry-picks apply cleanly. Do not
 reformat them, do not reindent them, do not clean them up in passing. The
 `aggregate_jsonl` jq programs in `backfill.sh` and `persist-session.sh` are the
 strictest case: they are the most likely recipients of an upstream

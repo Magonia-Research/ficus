@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # run-reconciliation.sh — proves the fork's backfill produces the same ledger rows as
-# pristine upstream (tag upstream-43fb883) on committed fixture transcripts.
+# pristine upstream (commit 43fb883) on committed fixture transcripts.
 #
 # Fixtures cover: dedup replay (streaming snapshots, last-wins), subagent transcripts,
 # mixed-model dominance, a corrupted JSONL line (slow path), and an excluded non-Claude
-# model. Expected rows were recorded ONCE from the upstream tag with:
+# model. Expected rows were recorded ONCE from the pinned upstream commit with:
 #
 #   bash tests/run-reconciliation.sh --record
 #
@@ -49,7 +49,7 @@ trap cleanup EXIT
 
 # Run a backfill from a given repo tree against the fixtures in a fresh sandbox;
 # prints the resulting rows as a JSON array. Second arg names the DB env var
-# (CARBON_LEDGER_DB for the fork, CLAUDE_CARBON_DB for the upstream tag), so a
+# (CARBON_LEDGER_DB for the fork, CLAUDE_CARBON_DB for upstream), so a
 # missed rename in the fork falls back to the sandboxed default path and fails
 # both the row comparison and the legacy-path assertion below.
 run_backfill() {
@@ -76,14 +76,30 @@ run_backfill() {
   echo "${rows:-[]}"
 }
 
-# --- record mode: regenerate expected.json from the pristine upstream tag ----
+# --- record mode: regenerate expected.json from the pinned upstream commit ---
 if [ "${1:-}" = "--record" ]; then
   WORKTREE="${TMPROOT}/upstream"
-  git -C "$REPO_DIR" worktree add --detach "$WORKTREE" upstream-43fb883 >/dev/null
+  # RESOLVE THE COMMIT, NOT A LOCAL TAG. This fork's history does not reach
+  # upstream, so there is no `upstream-43fb883` ref to check out; the commit has
+  # to come from the upstream remote. Recording is a manual maintenance step, so
+  # a fetch here is fine — but it must fail loudly rather than record rows from
+  # whatever happened to be checked out.
+  UPSTREAM_SHA="43fb883ac1989d962c8699afb0be37fbe69c4476"
+  if ! git -C "$REPO_DIR" cat-file -e "${UPSTREAM_SHA}^{commit}" 2>/dev/null; then
+    echo "Fetching pinned upstream commit ${UPSTREAM_SHA}..." >&2
+    if ! git -C "$REPO_DIR" fetch --quiet upstream "$UPSTREAM_SHA" 2>/dev/null &&
+      ! git -C "$REPO_DIR" fetch --quiet upstream 2>/dev/null; then
+      echo "FAIL: cannot resolve upstream commit ${UPSTREAM_SHA}." >&2
+      echo "  git remote add upstream https://github.com/gwittebolle/claude-carbon.git" >&2
+      echo "  git fetch upstream" >&2
+      exit 1
+    fi
+  fi
+  git -C "$REPO_DIR" worktree add --detach "$WORKTREE" "$UPSTREAM_SHA" >/dev/null
   rows="$(run_backfill "$WORKTREE" CLAUDE_CARBON_DB)"
   jq -n --argjson rows "$rows" '{
     _provenance: {
-      source: "upstream tag upstream-43fb883 (43fb883ac1989d962c8699afb0be37fbe69c4476)",
+      source: "upstream claude-carbon commit 43fb883ac1989d962c8699afb0be37fbe69c4476",
       command: "bash tests/run-reconciliation.sh --record",
       note: "regenerate ONLY if fixtures change; factor changes must never change these rows"
     },
@@ -125,8 +141,8 @@ diffs="$(jq -r --slurpfile act "${TMPROOT}/actual.json" '
 
 count="$(jq '.rows | length' "$EXPECTED")"
 if [ -n "$diffs" ]; then
-  echo "FAIL reconciliation vs upstream-43fb883:" >&2
+  echo "FAIL reconciliation vs upstream 43fb883:" >&2
   printf '%s\n' "$diffs" >&2
   exit 1
 fi
-echo "PASS reconciliation: ${count}/${count} rows match upstream-43fb883 (tokens exact, cost/co2 within 1e-6)"
+echo "PASS reconciliation: ${count}/${count} rows match upstream 43fb883 (tokens exact, cost/co2 within 1e-6)"

@@ -36,7 +36,7 @@ could do with it.
 
 Ficus is a fork of
 [claude-carbon](https://github.com/gwittebolle/claude-carbon) pinned at
-`upstream-43fb883`. Several upstream components were deleted in this fork
+`43fb883`. Several upstream components were deleted in this fork
 because of their attack surface — the OAuth-token-reading statusline, the
 pipe-to-shell installer, and the auto-update path (see the README's fork
 provenance section). A vulnerability that only exists in upstream code this fork

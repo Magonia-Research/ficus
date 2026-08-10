@@ -2,8 +2,8 @@
 # run-lint.sh — shellcheck + shfmt gate for the carbon-ledger fork.
 #
 # Runs shellcheck on every *.sh in the tree, upstream's own invocation (--severity=warning),
-# and shfmt on fork-added files only — files present in the upstream-43fb883 tag keep their
-# upstream formatting so cherry-pick diffs stay minimal.
+# and shfmt on fork-added files only — files listed in tests/upstream-43fb883-files.txt keep
+# their upstream formatting so cherry-pick diffs stay minimal.
 #
 # Uses local binaries when present; otherwise runs the pinned container images
 # (Apple `container` CLI, --platform linux/arm64 — the CLI mis-detects the platform
@@ -53,7 +53,22 @@ else
 fi
 
 # --- shfmt (fork-added files only) -----------------------------------------
-upstream_list="$(git ls-tree -r upstream-43fb883 --name-only 2>/dev/null || true)"
+# The upstream file list is COMMITTED DATA, not a ref lookup. Deriving it from a
+# local `upstream-43fb883` tag failed silently the moment this history stopped
+# reaching upstream: git printed nothing, `|| true` swallowed the error, every
+# upstream file read as fork-added, and shfmt failed the suite against the files
+# it exists to leave alone. A missing manifest is a hard error now, because the
+# only thing worse than this gate failing is it passing for the wrong reason.
+UPSTREAM_MANIFEST="${REPO_DIR}/tests/upstream-43fb883-files.txt"
+if [ ! -f "$UPSTREAM_MANIFEST" ]; then
+  echo "FAIL: missing $UPSTREAM_MANIFEST — cannot separate fork files from upstream files" >&2
+  exit 1
+fi
+upstream_list="$(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$UPSTREAM_MANIFEST")"
+if [ -z "$upstream_list" ]; then
+  echo "FAIL: $UPSTREAM_MANIFEST lists no paths" >&2
+  exit 1
+fi
 fork_files=()
 for f in "${sh_files[@]}"; do
   if ! grep -qxF "$f" <<<"$upstream_list"; then

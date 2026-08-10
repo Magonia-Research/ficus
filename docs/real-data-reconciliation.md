@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-06 (Phase 9 live wiring)
 **Method:** fork `scripts/backfill.sh` backfilled the live `~/.claude/projects`
-transcripts into `~/.claude/carbon-ledger/carbon.db`; a detached worktree of tag
-`upstream-43fb883` then backfilled the same transcripts into a scratch DB
+transcripts into `~/.claude/carbon-ledger/carbon.db`; a detached worktree of
+upstream commit `43fb883` then backfilled the same transcripts into a scratch DB
 (`CLAUDE_CARBON_DB` override, live config dir read-only). Row-level SQL join on
 `session_id` compared all four token columns exactly and co2/cost within 1e-6.
 

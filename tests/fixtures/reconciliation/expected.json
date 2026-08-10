@@ -1,6 +1,6 @@
 {
   "_provenance": {
-    "source": "upstream tag upstream-43fb883 (43fb883ac1989d962c8699afb0be37fbe69c4476)",
+    "source": "upstream claude-carbon commit 43fb883ac1989d962c8699afb0be37fbe69c4476",
     "command": "bash tests/run-reconciliation.sh --record",
     "note": "regenerate ONLY if fixtures change; factor changes must never change these rows"
   },

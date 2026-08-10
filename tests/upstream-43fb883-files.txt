@@ -1,0 +1,76 @@
+# Every path present in upstream claude-carbon at commit
+# 43fb883ac1989d962c8699afb0be37fbe69c4476, the commit this fork is pinned to.
+#
+# WHY THIS FILE EXISTS. run-lint.sh holds fork-added shell files to this fork's
+# formatting (shfmt -i 2) and leaves upstream's files in upstream's formatting,
+# so the two can still be diffed when reviewing an upstream change. It used to
+# derive that split by reading a local `upstream-43fb883` git tag. This
+# repository's history does not reach upstream, so there is no such tag and no
+# ref to resolve — and the failure was silent: `git ls-tree` printed nothing,
+# every upstream file was misread as fork-added, and shfmt failed the suite
+# against files it was never meant to touch.
+#
+# A committed list has no such failure mode. It is a fact about a commit that
+# will never change, so pinning it as data rather than deriving it from a ref is
+# both correct and cheaper. Verify it against upstream at any time with:
+#
+#   git fetch upstream && \
+#     git ls-tree -r 43fb883ac1989d962c8699afb0be37fbe69c4476 --name-only
+#
+# Lines beginning with # and blank lines are ignored.
+.claude-plugin/marketplace.json
+.claude-plugin/plugin.json
+.github/ISSUE_TEMPLATE/bug_report.yml
+.github/ISSUE_TEMPLATE/config.yml
+.github/ISSUE_TEMPLATE/feature_request.yml
+.github/PULL_REQUEST_TEMPLATE.md
+.github/workflows/ci.yml
+.github/workflows/traffic.yml
+.gitignore
+CHANGELOG.md
+CITATION.cff
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+LICENSE
+METHODOLOGY.md
+README.md
+SECURITY.md
+bin/claude-carbon.js
+data/factors.json
+data/prices.json
+docs/data-flow.png
+docs/demo.gif
+docs/demo/demo.tape
+docs/demo/fake-session.sh
+docs/example-report-v2.png
+hooks/hooks.json
+install.sh
+package.json
+scripts/backfill.sh
+scripts/check-update.sh
+scripts/check-versions.sh
+scripts/configure-settings.sh
+scripts/generate-report.sh
+scripts/persist-session.sh
+scripts/recompute.sh
+scripts/release.sh
+scripts/safety-rescan.sh
+scripts/setup.sh
+scripts/statusline.sh
+scripts/traffic-snapshot.sh
+scripts/update.sh
+skills/carbon-card/SKILL.md
+skills/carbon-report/SKILL.md
+skills/carbon-update/SKILL.md
+stats/paths.jsonl
+stats/referrers.jsonl
+stats/traffic.json
+templates/logo.png
+templates/report-detailed-en.html
+templates/report-detailed.html
+templates/report-summary-en.html
+templates/report-summary.html
+templates/social-preview.html
+tests/methodology-vectors.json
+tests/run-install-tests.sh
+tests/run-vectors.sh
