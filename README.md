@@ -59,8 +59,10 @@ implementation.
 ![A terminal statusline. The left side shows the model Opus 5, the project carbon-ledger, the branch main, a context bar at 22 percent, $14.15, 36 minutes 38 seconds elapsed and a 99 percent cache rate. Right of a vertical rule, a carbon column shows all-time totals of 2268.8 kilowatt-hours, 11952 litres and 0.65 tonnes, then 0.00 tonnes removed of 0.65 emitted and $147.81 of $147.81 still owed. A full-width row underneath shows this session: 60.35 watt-hours, 317.9 millilitres, 17.32 grams and 0.39 cents.](docs/statusline.png)
 
 Right of the rule, read from the ledger: `∑ ⚡` all-time electricity, `💧` water,
-`💨` CO2e; then `💨 removed/emitted` tonnes and `$owed/total` to clear the
-balance at the removal price. The row underneath is this conversation only,
+`💨` CO2e; then `💨 outstanding/emitted` tonnes and `$owed/total` to clear the
+balance at the removal price. Both pairs count down: the left number is what is
+still to settle, the right is the whole job, and both go negative rather than
+clamping once you pass carbon-neutral. The row underneath is this conversation only,
 recomputed on every repaint: energy, water, CO2e, and `▲` what removing it would
 cost (in cents below a dollar). Everything left of the rule is Claude Code's own
 status JSON, including that first dollar figure — it is the price of the tokens,

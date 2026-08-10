@@ -7,7 +7,7 @@ bottom (directly above Claude Code's mode line):
 
 ```
 [Fable 5] 📁 repo │ 🌿 main          │ ∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t
-████ 10% │ $8.08 │ ⏱ 2h 17m  ↻99%   │ 💨 0.00t/0.62t · $99.82/99.82 total
+████ 10% │ $8.08 │ ⏱ 2h 17m  ↻99%   │ 💨 0.62t/0.62t · $99.82/99.82 owed
 ⚡ 0.42Wh 💧 2.2mL 💨 0.12g · ▲ 0.03¢
 ```
 
@@ -19,7 +19,7 @@ statusline reads, so it cannot drift from the numbers on your screen.
 
 **The column carries no header row.** A `Totals:` label above it cost a full
 blank line across the left half of the statusline to say what the `∑` prefix
-and the trailing `total` already say. Three rows, no gap.
+and the trailing `owed` already say. Three rows, no gap.
 
 **Session figures sit with the session, totals with the totals.** The bottom row
 is everything about the conversation in front of you: its energy, water and CO2e
@@ -33,14 +33,29 @@ Below a dollar the session cost is shown **in cents**. At $227/t a whole cent is
 opening stretch of every session and then jump — indistinguishable from a figure
 that has stopped updating.
 
-The totals row carries the 💨 paid-off/emitted pair (verified removal purchased
-vs total emitted, tonnes) and the owed/overall dollar pair, both at the removal
-rate from `data/offset-constants.json` ($227/t biochar CORCs). In
-`$99.82/99.82 total` the left number is what is still owed to clear the balance
-and the right is the overall cost of everything emitted; the gap between them is
-what has been contributed over time. The segment cache is three lines: the ∑
-readings, the pre-computed owed/overall pair, and the paid-off/emitted pair; the
-session cost comes out of the same awk that prices the live readings.
+The totals row carries the 💨 outstanding/emitted pair (tonnes still to remove
+vs total emitted) and the owed/overall dollar pair, both at the removal rate from
+`data/offset-constants.json` ($227/t biochar CORCs). **Both pairs count down.**
+In `$99.82/99.82 owed` the left number is what is still owed to clear the balance
+and the right is the overall cost of everything emitted; in `💨 0.62t/0.62t` the
+left is the same statement in tonnes. The gap between the two numbers in either
+pair is what has been contributed over time, and neither left number is clamped —
+past carbon-neutral they go negative.
+
+That symmetry is deliberate and was not always there. The tonnes pair used to
+read paid-off/emitted, counting *up* toward its denominator beside a dollar pair
+counting *down* toward zero — identical `x/y` syntax, opposite directions, and
+the tonnes half also disagreed with `balance_kg` on the dashboard and **Unoffset
+balance** in `carbon-review.sh`, both of which have always counted down.
+
+The two pairs still move at different times, which is a different distinction and
+an intentional one: only *verified removal* settles the tonnes, while every
+offset and donation dollar settles the dollars 1:1. A donation moves the left
+dollar figure and leaves the tonnes untouched.
+
+The segment cache is three lines: the ∑ readings, the pre-computed owed/overall
+pair, and the outstanding/emitted pair; the session cost comes out of the same
+awk that prices the live readings.
 
 (The reference snippet below is the minimal single-column form of the same
 segment — same inputs, no column padding. The live two-column render pads each
@@ -52,7 +67,7 @@ two pre-written files and does one awk. All DB work happens at write time:
 | File (in `~/.claude/carbon-ledger/`) | Written by | Read by statusline |
 | --- | --- | --- |
 | `factors.env` | `setup.sh`, `recompute.sh`, and `persist-session.sh` when a source constant is newer than the cache | `source` (shell vars, numeric-guarded) |
-| `segment-cache` | `persist-session.sh` (Stop hook), `backfill.sh`, `offset-record.sh`, `recompute.sh` | `sed -n Np` (three pre-formatted lines: `∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t` all-time readings / `99.82/99.82` owed-vs-overall USD / `💨 0.00t/0.62t` paid-off vs emitted) |
+| `segment-cache` | `persist-session.sh` (Stop hook), `backfill.sh`, `offset-record.sh`, `recompute.sh` | `sed -n Np` (three pre-formatted lines: `∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t` all-time readings / `99.82/99.82` owed-vs-overall USD / `💨 0.62t/0.62t` outstanding vs emitted) |
 
 `statusline-snippet.sh` at the repo root is the reference implementation and is
 what `tests/run-statusline-bench.sh` benchmarks (p95 < 50 ms) and checks against
@@ -106,7 +121,7 @@ form is `statusline-snippet.sh` at the repo root.
   statusline JSON does not split cache reads out, so the live number slightly
   overestimates cache-heavy sessions. The DB (and everything derived from it)
   uses the exact per-kind accounting; the statusline is a live approximation.
-- The `💨` paid-off/emitted pair refreshes on session end, backfill, recompute,
+- The `💨` outstanding/emitted pair refreshes on session end, backfill, recompute,
   and offset recording — not on every render, by design (render path stays
   file-only).
 - `factors.env` is a cache of `data/factors.json` and

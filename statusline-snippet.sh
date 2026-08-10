@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # statusline-snippet.sh — REFERENCE implementation of the carbon statusline
 # segment: session-live ⚡ energy / 💧 water / 💨 co2 plus the cached 💨
-# paid-off/emitted pair. See docs/statusline-segment.md for merging this into an
-# existing statusline (fold the jq fields into your existing single jq call).
+# outstanding/emitted pair. See docs/statusline-segment.md for merging this into
+# an existing statusline (fold the jq fields into your existing single jq call).
 #
 # Render-path budget rules: NO DB access, NO jq against factors.json — only
 # `source factors.env`, one awk, and `cat` of the pre-formatted segment cache.
@@ -49,7 +49,10 @@ EOF
 
 # Cache: line 1 = all-time ∑ readings; line 2 = owed/overall cost pair (USD
 # still owed to clear the balance over the overall emitted cost);
-# line 3 = 💨 paid-off/emitted (tonnes)
+# line 3 = 💨 outstanding/emitted (tonnes still to remove over total emitted).
+# Lines 2 and 3 are the same sentence in two units: what is LEFT, over the whole
+# job. Both numerators fall toward zero as you settle, and both go negative past
+# carbon-neutral rather than clamping.
 ALL=""
 TOTAL_COST=""
 BAL=""
@@ -68,5 +71,5 @@ printf '%s · ▲ %s\n' "$SEG" "$SESS_COST"
 printf '────────────────────────────────\n'
 TOTALS="$ALL"
 [ -n "$BAL" ] && TOTALS="${TOTALS:+${TOTALS} · }${BAL}"
-[ -n "$TOTAL_COST" ] && TOTALS="${TOTALS:+${TOTALS} · }\$${TOTAL_COST} total"
+[ -n "$TOTAL_COST" ] && TOTALS="${TOTALS:+${TOTALS} · }\$${TOTAL_COST} owed"
 printf '%s' "$TOTALS"
