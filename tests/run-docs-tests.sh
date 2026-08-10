@@ -15,11 +15,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
 TMPROOT="$(mktemp -d "${TMPDIR:-/tmp}/carbon-ledger-docs-t.XXXXXX")"
+# THIS SUITE REBUILDS THE PUBLISHED FILE IN PLACE, under a frozen
+# CARBON_LEDGER_DOCS_TS so the determinism check has a stable date to compare.
+# That date is a test fixture, and leaving it behind publishes a page whose
+# own build date is a lie — which is exactly what shipped once, a page stamped
+# 2026-08-09 because the suite ran after the real build. Rebuild on the way out
+# with the real date so the tree is never left holding the fixture.
 cleanup() {
   case "$TMPROOT" in
   */carbon-ledger-docs-t.*) rm -rf "$TMPROOT" ;;
   *) echo "refusing to clean unexpected path: $TMPROOT" >&2 ;;
   esac
+  unset CARBON_LEDGER_DOCS_TS
+  bash "${REPO_DIR}/scripts/build-docs.sh" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -110,8 +118,32 @@ want "tab stops reserve the masthead height" 'a\[href\], button, summary, input,
 # SC 2.1.1 Keyboard, Level A. The settings.json snippet is 528px wide against
 # 255px of visible width at a 320px viewport — without a tab stop, half the
 # install instructions are unreachable without a pointer.
-want "code blocks are keyboard-scrollable" '<pre tabindex="0">'
-want "table wrappers are keyboard-scrollable" '<div class="tw" tabindex="0">'
+# COUNT THEM, DO NOT SAMPLE THEM. `want` greps for ONE occurrence anywhere on
+# the page, which is a different claim from "every one of them". A single
+# wrapped table satisfied the old check while an unwrapped table shipped
+# beside it, carrying exactly the overflow this criterion exists to prevent.
+# The assertion has to scale with the page or it stops being an assertion.
+n_tables="$(grep -o '<table[ >]' "$OUT" | wc -l | tr -d ' ')"
+n_unwrapped="$(awk '
+  /<table[ >]/ { if (prev !~ /<div class="tw" tabindex="0">/) n++ }
+  { prev = $0 }
+  END { print n + 0 }
+' "$OUT")"
+if [ "$n_tables" -gt 0 ] && [ "$n_unwrapped" -eq 0 ]; then
+  echo "PASS docs: all ${n_tables} tables sit in a keyboard-scrollable wrapper"
+else
+  echo "FAIL docs: ${n_unwrapped}/${n_tables} tables are not preceded by <div class=\"tw\" tabindex=\"0\">" >&2
+  fail=1
+fi
+
+n_pre="$(grep -o '<pre[ >]' "$OUT" | wc -l | tr -d ' ')"
+n_pre_ok="$(grep -o '<pre tabindex="0">' "$OUT" | wc -l | tr -d ' ')"
+if [ "$n_pre" -gt 0 ] && [ "$n_pre" -eq "$n_pre_ok" ]; then
+  echo "PASS docs: all ${n_pre} code blocks are keyboard-scrollable"
+else
+  echo "FAIL docs: $((n_pre - n_pre_ok))/${n_pre} code blocks are missing tabindex=\"0\"" >&2
+  fail=1
+fi
 # A <footer> inside <main> maps to role=generic, so the licence, methodology and
 # notices were unreachable by landmark navigation.
 if grep -q '</main>' "$OUT" && [ "$(grep -n '</main>' "$OUT" | head -1 | cut -d: -f1)" -lt "$(grep -n '<footer' "$OUT" | head -1 | cut -d: -f1)" ]; then
