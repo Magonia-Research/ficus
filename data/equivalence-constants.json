@@ -1,0 +1,32 @@
+{
+  "_doc": "Real-world equivalence factors for the dashboard's three headline meter readings. Nothing here is estimated, derived or rounded by this project: each value is a figure published by a named authority, recorded with the sentence it came from, the URL, and the date it was fetched. scripts/generate-dashboard.sh divides the ledger totals by these at generation time. Refresh by re-fetching the cited page and updating the value, _source and _recorded together — never one without the others.",
+  "_recorded": "2026-08-07",
+  "_scope": "These equivalences illustrate scale. They are not scope-matched: the ledger's CO2e is usage-only (inference electricity), while the EPA vehicle factor is tailpipe CO2e per mile. The comparison answers 'how big is this number' and nothing more.",
+  "energy": {
+    "value": 10791,
+    "unit": "kWh per year",
+    "noun": "days of an average U.S. home's electricity",
+    "cite": "EIA: average U.S. residential customer used 10,791 kWh in 2022",
+    "cite_url": "https://www.eia.gov/tools/faqs/faq.php?id=97&t=3",
+    "_source": "U.S. Energy Information Administration, FAQ 'How much electricity does an average American home use?': \"In 2022, the average annual amount of electricity sold to (purchased by) a U.S. residential electric-utility customer was 10,791 kilowatthours (kWh), an average of about 899 kWh per month.\" Page last updated 2024-01-08. https://www.eia.gov/tools/faqs/faq.php?id=97&t=3 — fetched 2026-08-07.",
+    "_formula": "days = kWh * 365 / 10791"
+  },
+  "water": {
+    "value": 63.6,
+    "unit": "liters per shower",
+    "noun": "showers",
+    "cite": "EPA WaterSense: 8-minute shower at 2.1 gal/min = 16.8 gal = 63.6 L",
+    "cite_url": "https://www.epa.gov/watersense/showerheads",
+    "_source": "U.S. EPA WaterSense, 'Save Water and Energy by Showering Better': \"The average shower lasts about eight minutes. Since the average showerhead has a water flow of 2.1 gallons per minute, each shower uses more than 16 gallons of water!\" 8 min x 2.1 gal/min = 16.8 US gal; 16.8 x 3.785411784 = 63.6 L. https://www.epa.gov/sites/default/files/2017-02/documents/ws-ourwater-shower-better-learning-resource_0.pdf — fetched 2026-08-07. cite_url points at the stable WaterSense showerheads page, which carries the same 2.5 gpm federal standard context.",
+    "_formula": "showers = liters / 63.6"
+  },
+  "co2": {
+    "value": 0.393,
+    "unit": "kg CO2e per mile",
+    "noun": "miles driven in an average gasoline car",
+    "cite": "EPA: 3.93e-4 t CO2e per mile, 2022 fleet (22.8 mpg, 10,917 mi/yr)",
+    "cite_url": "https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references",
+    "_source": "U.S. EPA, Greenhouse Gas Equivalencies Calculator — Calculations and References, 'Gasoline-powered passenger vehicles per mile': 3.93 x 10^-4 metric tons CO2e/mile, from a 2022 weighted-average combined fuel economy of 22.8 mpg and average annual VMT of 10,917 miles. 3.93e-4 t = 0.393 kg. https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references — fetched 2026-08-07.",
+    "_formula": "miles = kg CO2e / 0.393"
+  }
+}

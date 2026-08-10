@@ -1,0 +1,85 @@
+{
+  "_methodology": "Jegham et al. 2025 (v6) - AWS PUE 1.14, AWS region grid CIF 0.287 kgCO2e/kWh (location-based; US average is ~380). Sonnet input/output are a 3-point OLS fit to the three measured Claude 3.7 Sonnet per-query energies (0.950 / 2.989 / 5.671 Wh); marginal ratio ~21:1 output:input. Cross-validated against EcoLogits (GenAI Impact), bracketing the same range. Opus = 2x Sonnet (EcoLogits Opus 4.5+ params and the Anthropic price ratio both imply ~1.7-2x; band 2x-5x), Haiku = 0.5x, Fable = 2x Opus. Order-of-magnitude estimates.",
+  "_units": "gCO2e per million tokens",
+  "_source": "https://arxiv.org/abs/2505.09598",
+  "_cache_read_factor": "Energy of a cache_read token as a fraction of an uncached input token. Engineering estimate (~0.08, defensible range 0.05-0.15) derived from the decode-phase KV re-read residual. NOT Anthropic's 0.1x billing ratio (a price, not energy). See METHODOLOGY.md.",
+  "cache_read_factor": 0.08,
+  "_fable": "No published measurement for Fable 5 (claude-fable-5 / claude-mythos-5). Extrapolated from Opus by the list-price ratio (2x, $10/$50 vs $5/$25), same approach as the Opus 3x-Sonnet extrapolation.",
+  "models": {
+    "fable": {
+      "input": 156,
+      "output": 3304
+    },
+    "opus": {
+      "input": 78,
+      "output": 1652
+    },
+    "sonnet": {
+      "input": 39,
+      "output": 826
+    },
+    "haiku": {
+      "input": 20,
+      "output": 413
+    }
+  },
+  "_exclude_models": "Sessions whose model string does not contain 'claude' (e.g. local models served behind ANTHROPIC_BASE_URL) are always stored with cost_usd=0, co2_grams=0 and excluded=1, and left out of report aggregates. Add case-insensitive grep -E patterns here to exclude additional models by name.",
+  "exclude_models": [],
+  "physics": {
+    "_doc": "Global constants deriving energy/water/embodied from co2_grams. energy_wh = co2_grams / grid_cif_g_per_wh EXACTLY (CIF identity: the Jegham co2 factors are energy x CIF, so dividing recovers facility energy in Wh). water_ml = energy_wh x (wue_onsite/pue + wue_offsite) — on-site cooling water scales with IT energy (E/PUE), off-site generation water with facility energy. embodied_gco2e = energy_wh x embodied_gco2e_per_kwh / 1000. All figures carry the global +/-50% order-of-magnitude caveat (METHODOLOGY.md).",
+    "grid_cif_g_per_wh": {
+      "value": 0.287,
+      "_source": "AWS location-based grid carbon intensity 0.287 kgCO2e/kWh = 0.287 g/Wh, Jegham et al. 2025 (arXiv:2505.09598) — the same constant the co2 factors embed, making the identity exact. Recorded 2026-08-06."
+    },
+    "pue": {
+      "value": 1.14,
+      "_source": "AWS fleet PUE 1.14, Jegham et al. 2025 / upstream METHODOLOGY.md. Recorded 2026-08-06."
+    },
+    "wue_onsite_l_per_kwh": {
+      "value": 0.18,
+      "_source": "AWS on-site WUE 0.18 L/kWh (AWS 2023 sustainability figure, documented in upstream METHODOLOGY.md:42-47); applied to IT energy E/PUE. Recorded 2026-08-06."
+    },
+    "wue_offsite_l_per_kwh": {
+      "value": 5.11,
+      "_source": "US off-site (generation) water intensity 5.11 L/kWh, WRI methodology via Li et al. Making AI Less Thirsty, documented in upstream METHODOLOGY.md:42-47; applied to facility energy. Recorded 2026-08-06."
+    },
+    "embodied_gco2e_per_kwh": {
+      "value": 44.1,
+      "_source": "Derived proxy: 8xH100 server embodied = 5700 kgCO2e (p5.48xlarge ex-GPU, BoaviztAPI) + 8 x 273 kgCO2e (H100 80GB, Lees-Perasso et al.) = 7884 kgCO2e over a 3-year life; lifetime energy at full TDP = (8 x 0.7 kW + 1.2 kW) x 26280 h = 178704 kWh; 7884000 / 178704 = 44.1 gCO2e/kWh. Allocation proxies through energy because the DB stores tokens, not GPU-seconds. Caveat: assumes 100% utilization at TDP; lower utilization raises per-kWh embodied. EcoLogits methodology (https://ecologits.ai/latest/methodology/llm_inference/, fetched 2026-08-06)."
+    }
+  },
+  "ecologits": {
+    "_doc": "Cross-check methodology ONLY — never used for ledger columns (scripts/check-crosscheck.sh). EcoLogits LLM-inference model: per-GPU energy per OUTPUT token f_E(P_active, B) = alpha*e^(beta*B)*P_active + gamma (Wh/token, ML.ENERGY fit); GPUs = next power of two of ceil(1.2 * P_total * 2 bytes / 80 GB); server non-GPU energy per token = (1/tps/3600 h) * server_non_gpu_kw*1000 W * (gpus/gpus_per_server) / batch_size; E_request = pue * (gpus * f_E + non-GPU share) per output token. Input and cache tokens are ~0 energy in this model, which is why the gate compares BLENDED per-session CO2e over the golden-vector mixes, never per-factor.",
+    "_source": "EcoLogits (JOSS DOI 10.21105/joss.07471), methodology page https://ecologits.ai/latest/methodology/llm_inference/ fetched 2026-08-06; alpha/beta/gamma are its ML.ENERGY-fitted constants.",
+    "alpha_wh_per_token_per_b": 0.00000117,
+    "beta_per_batch": -0.0112,
+    "gamma_wh_per_token": 0.0000405,
+    "batch_size": 64,
+    "gpu_mem_gb": 80,
+    "gpus_per_server": 8,
+    "server_non_gpu_kw": 1.2,
+    "_params": "Anthropic discloses no parameter counts (re-verified 2026-08). p_active_b/p_total_b are dense-equivalent estimates in line with EcoLogits closed-model practice; tps is a typical observed API decode throughput. Uncertainty: order of magnitude. These enter ONLY the cross-check band, never the ledger.",
+    "models": {
+      "fable": {
+        "p_active_b": 800,
+        "p_total_b": 800,
+        "tps": 15
+      },
+      "opus": {
+        "p_active_b": 400,
+        "p_total_b": 400,
+        "tps": 20
+      },
+      "sonnet": {
+        "p_active_b": 200,
+        "p_total_b": 200,
+        "tps": 40
+      },
+      "haiku": {
+        "p_active_b": 50,
+        "p_total_b": 50,
+        "tps": 80
+      }
+    }
+  }
+}

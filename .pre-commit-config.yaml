@@ -1,0 +1,15 @@
+# prek / pre-commit config — local hooks only, no network repos.
+# Mirrors .githooks/pre-commit; that shim is what runs while prek is not installed.
+repos:
+  - repo: local
+    hooks:
+      - id: lint
+        name: shellcheck + shfmt (containerized fallback)
+        entry: tests/run-lint.sh
+        language: system
+        pass_filenames: false
+      - id: vectors
+        name: methodology golden vectors
+        entry: tests/run-vectors.sh
+        language: system
+        pass_filenames: false

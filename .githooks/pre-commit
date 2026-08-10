@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# pre-commit — versioned hook (core.hooksPath=.githooks).
+# Uses prek when installed; otherwise runs the same checks directly.
+
+set -euo pipefail
+
+REPO_DIR="$(git rev-parse --show-toplevel)"
+cd "$REPO_DIR"
+
+if command -v prek >/dev/null 2>&1; then
+  exec prek run
+fi
+
+bash tests/run-lint.sh
+bash tests/run-vectors.sh

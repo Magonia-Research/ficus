@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Ficus — carbon station</title>
+<style>
+/* ===========================================================================
+   FICUS — carbon station
+   ---------------------------------------------------------------------------
+   DIRECTION: THE STATION RECORD.
+
+   Earlier passes made this a statement of account, then an instrument console.
+   Both dressed the page as a container. This one takes its shape from what the
+   ledger actually measures: one act, recorded as three physical streams —
+   carbon, electricity, water — at one monitoring station, over time.
+
+   So the page is a station record. Three streams, each with the same trio of
+   readings, then one shared time axis with all three traces on it, then the
+   settlement, then the books, then the giving briefing, then the derivation.
+   The structure IS the argument: the same three readings, in the same order,
+   for every stream, so the eye learns the pattern once and reads the rest.
+
+   SIGNATURE — USAGE OVER TIME (see the .lane__n rules and drawTrace(); the
+   internal names still say "trace", which is what this was called while it was
+   being built — the reader-facing name is the one that had to change). Three lanes
+   stacked on one monthly axis, thin columns, each lane in its own colour and
+   labelled with its own unit. It is the only element here that could not be
+   lifted from an admin template, and it is honest about something a prettier
+   chart would hide: the three traces are CONGRUENT BY CONSTRUCTION. Energy is
+   the physical quantity; carbon and water are derived from it by fixed
+   published factors, so the shapes must match. Drawing them aligned makes that
+   identity visible instead of implying three independent signals. The caption
+   under the figure says so in words.
+
+   SECOND SIGNATURE — THE SPLIT READOUT. Every machine figure on this page sets
+   its integer part large and its fraction small, the way a meter face does.
+   No webfont is permitted here, so the numbers have to BE the typography: this
+   is the one device that makes a system-font page unmistakable. Both parts are
+   plain text in one element, so a screen reader still reads "41.60".
+
+   Two voices, one rule:
+     MONO  — everything the machine produced: readings, identifiers, hashes,
+             axis ticks, eyebrows, badges.
+     SANS  — everything a human wrote: titles, notes, methodology, the giving
+             briefing.
+   No webfont anywhere: the page must render with the network off, so both
+   stacks are system fonts (tests forbid font-loading at-rules and every loaded
+   reference, so this comment must not spell that at-rule out either).
+
+   Mint stays what earlier passes made it: LINE-WORK, NEVER A FIELD. It rules
+   the header, the section heads, the settled span of the measure, the callout
+   bars. Every surface on this page is white or a near-white neutral; nothing
+   is tinted green. A mint that is the paper is a mood; a mint that is the
+   ruling is a system.
+
+   ---------------------------------------------------------------------------
+   CONTRAST — WCAG 2.x relative-luminance model, (L1+0.05)/(L2+0.05).
+   This is the currently normative model: WCAG 2.2 is the W3C Recommendation.
+   APCA/Lc values belong to the WCAG 3.0 draft, which has no normative force,
+   and are deliberately not used here. Requirements applied, quoted:
+
+     SC 1.4.3 Contrast (Minimum), Level AA — "The visual presentation of text
+       and images of text has a contrast ratio of at least 4.5:1", except
+       "Large-scale text and images of large-scale text have a contrast ratio
+       of at least 3:1". Large-scale is 18pt, or 14pt bold.
+
+     SC 1.4.11 Non-text Contrast, Level AA — "The visual presentation of the
+       following have a contrast ratio of at least 3:1 against adjacent
+       color(s): User Interface Components ... Graphical Objects - Parts of
+       graphics required to understand the content, except when a particular
+       presentation of graphics is essential to the information being
+       conveyed." Its own note: "The 3:1 contrast ratios referenced in this
+       success criterion is intended to be treated as threshold values ... the
+       computed values should not be rounded (e.g. 2.999:1 would not meet the
+       3:1 threshold)."
+
+   That same Understanding document warns that anti-aliasing renders
+   "particularly thin lines and shapes of non-text elements ... with a much
+   fainter color than the actual color defined in the underlying CSS", and
+   advises authors "to avoid particularly thin lines and shapes, or to use a
+   combination of colors that exceeds the normative requirements". Every
+   meaning-bearing rule here is 2-3px and every colour that draws one clears
+   3:1 with margin, which is that second option taken deliberately.
+
+   ONE MODE, AND IT IS LIGHT. No dark variant, no toggle, and no colour-scheme
+   preference block anywhere in this stylesheet — a test greps the rendered
+   page for that feature name and fails if it reappears, so, as with the
+   font-loading at-rule above, this comment must not spell it out. This is a
+   printable tax document: a record that changes colour depending on who opens
+   it is a record you cannot check against the copy you filed. The page
+   declares itself light twice, so the browser does not auto-darken what it
+   draws itself:
+
+     :root { color-scheme: light }                the CSS declaration
+     <meta name="color-scheme" content="light">   in the document head
+
+   Per WHATWG HTML the meta form exists "to aid user agents in rendering the
+   page background with the desired color scheme immediately (rather than
+   waiting for all CSS in the page to load)", its value "must be a string that
+   matches the syntax for the CSS 'color-scheme' property value", and there
+   "must not be more than one meta element with its name attribute value set to
+   an ASCII case-insensitive match for color-scheme per document". The meta
+   covers the first paint; the declaration covers UA-drawn furniture for the
+   rest of the document's life.
+
+   THE NEUTRAL TIER is a named dark-grey ramp. Every grey that touches text
+   clears 4.5:1 on BOTH surfaces, so a label never has to know which surface it
+   landed on. Measured ratios — vs sheet #ffffff / vs plane #f1f3f2:
+
+     grey-950  18.31 / 16.43     body ink, headline figures
+     grey-800  12.34 / 11.07     titles, labels, table heads
+     grey-700   8.71 /  7.82     secondary prose
+     grey-600   5.61 /  5.03     tertiary, captions, axis TICK TEXT
+     grey-500   3.59 /  3.22     NON-TEXT ONLY (axis lines, baselines)
+     accent     6.58 /  5.91     critical  7.32 / 6.57
+
+   THE TWO MINTS.
+     --mint      #0f9563   3.82 sheet / 3.43 plane   MEANING-BEARING line-work
+     --mint-soft #9cd8c2   1.61 sheet / 1.45 plane   DECORATIVE hairlines only
+
+   --mint draws every rule a reader needs in order to parse the record: the
+   header rule, the section-head rule, the settled span of the measure, the
+   bar on a callout, the edge of a lead badge. Those are "Parts of graphics
+   required to understand the content" under SC 1.4.11, so 3:1 is a
+   requirement and 3.82 is the margin over it. --mint-soft carries no meaning —
+   card borders, row rules, dividers, where the structure is already in the
+   markup and nothing is lost if the line disappears.
+
+   The focus ring does NOT go mint. It stays --ink-1 at 18.31:1: a focus
+   indicator should be as loud as the page can make it, and brand is not worth
+   a ratio there.
+
+   ---------------------------------------------------------------------------
+   CHART PALETTE — FOUR SLOTS, because the page draws four things: the three
+   streams, and the settled span of the measure.
+
+     --viz-carbon  #4a44a8   7.83 sheet / 7.02 plane   indigo
+     --viz-energy  #a03d80   6.05 sheet / 5.42 plane   mulberry
+     --viz-water   #1b83c4   4.13 sheet / 3.70 plane   steel blue
+     --viz-settled #0f9563   3.82 sheet / 3.43 plane   the brand mint
+
+   No orange and no red in any chart, by construction: every slot was searched
+   inside the cool half of the wheel only (sRGB HSL hue 150-330; measured
+   242/318/205/157). Emitting carbon is the normal state of doing the work, not
+   an error condition, so it is never dressed as one. Red survives on this page
+   in exactly one job — the ESTIMATE banner and the UNVERIFIED badge — and
+   never inside a figure.
+
+   Validated, not eyeballed, through the dataviz validator (OKLab dE x100,
+   Machado-Oliveira-Fernandes 2009 CVD simulation at severity 1.0) on ALL PAIRS
+   rather than adjacent ones, because the lane keys let a reader compare any
+   two marks on the page. Measured on the four together:
+     worst all-pairs CVD dE 8.3 (protan, energy vs carbon)   target 8, floor 6
+     worst all-pairs normal-vision dE 16.6 (carbon vs water) hard gate 15
+     all four clear 3:1 on the sheet AND on the plane; all sit inside the
+     light lightness band and above the 0.10 chroma floor.
+   Tritan separation is the weak axis of this set (dE ~3). Tritanopia is rare,
+   and nothing here rests on hue: every lane is spatially separated, directly
+   labelled, given a distinct lightness step, and repeated as a number in the
+   table underneath.
+
+   FOAM GREEN, AND WHERE IT COULD HONESTLY GO.
+
+     --viz-model  #127f74   4.87 sheet / 4.37 plane   deep seafoam
+
+   The model-family bars were the indigo. They are now a sea green, which is
+   what was asked for — but only there, and the reason is worth recording.
+
+   Foam green cannot become --viz-carbon. That token also draws the UNSETTLED
+   track on the settlement measure, and a green "unsettled" sitting beside the
+   mint "settled" would inhibit the one distinction this page exists to make.
+
+   It also cannot become a chart SERIES colour anywhere the mint appears as a
+   mark. Measured against --viz-settled #0f9563, every foam green tested lands
+   far under the separation a co-series needs (OKLab dE x100, normal vision):
+
+     #1f8f7a jade      4.4      #2a9d8f foam     6.6
+     #3aa08c pale foam 6.7      #127f74 seafoam  8.1   (hard gate 15)
+
+   That is not a defect in the search; it is what foam green IS. Mint sits at
+   OKLCH hue 160 and every seafoam is within about 25 degrees of it, so the two
+   are near-neighbours by definition.
+
+   #127f74 is the pick because it is the farthest from mint of the set while
+   still reading as a sea green rather than a blue, and it carries the most
+   contrast (4.87 on the sheet against 3.32 for a paler foam, which would also
+   have missed 3:1 on the plane at 2.98).
+
+   It is used on exactly one figure — the model-family bars — where it is the
+   ONLY series colour. A single-series chart has no pairs to confuse, every bar
+   is directly labelled with its kilograms, and the panel carries no
+   settled/unsettled dimension at all. Mint never appears there as a mark.
+
+   THREE CHANNELS, NOT ONE. The streams differ by hue, by OKLCH lightness
+   (0.451 carbon / 0.518 energy / 0.586 water — so the lanes still separate in
+   a greyscale print), and by position and label. Settled versus unsettled on
+   the measure differs by FILL, not hue:
+
+     settled     a solid mint span
+     unsettled   an open track — no fill, a 2px carbon-indigo outline
+
+   That replaces the 45-degree hatch the previous pass used. Filled-versus-open
+   is the strongest non-colour channel available: it survives a greyscale
+   print, every form of colour-vision deficiency, and forced-colours mode,
+   where a hatch pattern collapses into mud. It also says the right thing —
+   an unsettled balance is a measure not yet filled. A genuinely empty station
+   (nothing emitted at all) keeps a DASHED hairline track, so "no data" and
+   "not yet settled" never look the same.
+   =========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* paper — a white sheet on a near-white neutral plane. Neither is tinted.
+     The plane is deliberately close to the sheet: the cards are separated by a
+     mint hairline and a faint shadow, so the field behind them only has to be
+     distinguishable, not grey. Lightening it from #f1f3f2 also RAISES the
+     working mint's contrast against it, 3.43:1 to 3.61:1, so the SC 1.4.11
+     obligation on the rules gets easier rather than harder. */
+  --plane:     #f7f9f8;
+  --surface:   #ffffff;
+
+  /* the ruling — see THE TWO MINTS */
+  --mint:      #0f9563;
+  --mint-soft: #9cd8c2;
+
+  /* neutral tier */
+  --grey-950:  #101614;
+  --grey-800:  #2c3733;
+  --grey-700:  #414e49;
+  --grey-600:  #5c6b65;
+  --grey-500:  #7d8a85;
+
+  /* ink roles */
+  --ink-1:     var(--grey-950);
+  --ink-head:  var(--grey-800);
+  --ink-2:     var(--grey-700);
+  --ink-3:     var(--grey-600);
+  --axis:      var(--grey-500);
+
+  /* rule roles */
+  --rule:      var(--mint-soft);
+  --rule-key:  var(--mint);
+  --accent:    #0b6b3f;
+  --critical:  #a3271f;
+
+  /* chart slots — three streams plus the settled span. See CHART PALETTE. */
+  --viz-carbon:  #4a44a8;
+  --viz-energy:  #a03d80;
+  --viz-water:   #1b83c4;
+  --viz-settled: #0f9563;
+  --viz-model:   #127f74;   /* the model-family bars — see FOAM GREEN below */
+
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+
+  --shadow: 0 1px 2px rgb(16 22 20 / 5%);
+  --r-lg: 12px;
+  --r-md: 8px;
+  --r-sm: 4px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--plane);
+  color: var(--ink-1);
+  font: 400 0.9375rem/1.65 var(--sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Focus indicator: ink-1 measures 18.31:1 on the sheet, far above the 3:1 that
+   SC 1.4.11 asks of a focus indicator against the adjacent background. Never
+   removed — F78 is the documented failure for styling it away. */
+:focus-visible {
+  outline: 3px solid var(--ink-1);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  padding: 0.6rem 1rem;
+  background: var(--surface);
+  border: 2px solid var(--ink-1);
+  color: var(--ink-1);
+  font: 700 0.75rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.skip:focus { left: 1rem; top: 1rem; z-index: 20; }
+
+a { color: var(--accent); text-underline-offset: 0.18em; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* --- station header --------------------------------------------------------
+   Sticky: on a record this long, what you are reading and the period it covers
+   should not scroll away from the numbers. */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 2px solid var(--rule-key);
+}
+.bar__in {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 0.85rem 1.5rem;
+}
+/* A sticky header parks itself over whatever you just jumped or tabbed to,
+   which turns the skip link into a link that appears to do nothing.
+   scroll-margin-top reserves its height at every scroll target.
+   EVERY TAB STOP IS A SCROLL TARGET, not just the jump anchors. The browser
+   honours the scroll-margin of the element receiving focus, and a link inherits
+   none from its section — so with only #report/.block/.card listed here, tabbing
+   BACKWARDS through the page (which scrolls upward and parks the target at the
+   top edge) put focus completely behind the bar. Measured before this line was
+   widened: six elements obscured, five of them entirely, all in the giving
+   section. That is WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum), failure
+   technique F110 — a sticky header completely hiding a focused element.
+   scroll-padding-top is the load-bearing half and scroll-margin-top is the
+   belt. scroll-margin only helps when the browser DECIDES to scroll: an element
+   already inside the scrollport but sitting underneath a sticky overlay counts
+   as visible, so nothing scrolls and the margin never applies. Insetting the
+   scrollport itself takes that area out of "visible", so focus moving into it
+   forces a scroll. Measured: with margin alone, four giving links were still
+   entirely behind the bar; with both, none are. */
+html { scroll-padding-top: 5.5rem; }
+#report, .block, .card,
+a[href], button, summary, input, label, [tabindex] { scroll-margin-top: 5.5rem; }
+/* At 400% zoom (SC 1.4.10 Reflow) a stuck header is lost height, so past the
+   point where it costs a meaningful share of the viewport it scrolls away. */
+@media (max-height: 26rem) {
+  .bar { position: static; }
+}
+
+.brand { display: flex; align-items: center; gap: 0.65rem; margin: 0; }
+/* Three streams leaving one source: the mark is the page's thesis, drawn. */
+.brand__mark { display: block; width: 1.5rem; height: 1.5rem; flex: none; }
+.brand__t { margin: 0; font: 700 1.0625rem/1 var(--mono); letter-spacing: -0.01em; }
+.brand__sub {
+  margin: 0.15rem 0 0;
+  color: var(--ink-3);
+  font: 600 0.625rem/1.3 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.meta { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; margin: 0 0 0 auto; }
+.meta > div { display: flex; align-items: baseline; gap: 0.4rem; }
+.meta dt {
+  color: var(--ink-3);
+  font: 600 0.5625rem/1.4 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.meta dd { margin: 0; font: 600 0.75rem/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+
+/* --- page shell ------------------------------------------------------------ */
+.page { max-width: 78rem; margin: 0 auto; padding: 1.5rem 1.5rem 3.5rem; }
+
+/* --- the estimate banner --------------------------------------------------- */
+.flag {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  margin: 0 0 2rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--critical);
+  border-radius: var(--r-md);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+.flag__tag {
+  flex: none;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: var(--r-sm);
+  color: var(--critical);
+  font: 700 0.625rem/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* --- section rhythm --------------------------------------------------------
+   Every block opens the same way: an eyebrow naming the FRAME the block is
+   read in (lifetime, by month, as of today, tax year, before you give, how
+   these are made), then a title, then one line of orientation. The eyebrow is
+   information, not ornament — it tells you what period or basis the numbers
+   underneath are on, which on a ledger is the first thing you need. */
+.block { margin: 0 0 2.75rem; }
+.block:last-child { margin-bottom: 0; }
+.block__hd {
+  margin: 0 0 1.125rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 2px solid var(--rule-key);
+}
+.block__eyebrow {
+  display: block;
+  margin: 0 0 0.35rem;
+  color: var(--ink-3);
+  font: 700 0.625rem/1.4 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.block__t {
+  margin: 0;
+  color: var(--ink-1);
+  font: 600 clamp(1.25rem, 2.4vw, 1.5rem)/1.2 var(--sans);
+  letter-spacing: -0.015em;
+}
+.block__sub { margin: 0.3rem 0 0; max-width: 46rem; color: var(--ink-2); font-size: 0.8125rem; }
+
+.note { margin: 0 0 1.1rem; max-width: 48rem; color: var(--ink-2); font-size: 0.8125rem; }
+.note strong { color: var(--ink-1); font-weight: 600; }
+.note:last-child { margin-bottom: 0; }
+.empty { margin: 0; color: var(--ink-2); font-size: 0.8125rem; font-style: italic; }
+/* Chemistry keeps its case inside otherwise-uppercased labels: CO2e, not CO2E. */
+.cs { text-transform: none; }
+
+.sub__h {
+  margin: 1.75rem 0 0.7rem;
+  color: var(--ink-head);
+  font: 700 0.6875rem/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.sub__h:first-child { margin-top: 0; }
+
+/* --- cards ----------------------------------------------------------------- */
+.card {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+.card__b { padding: 1.25rem; }
+.card__t {
+  margin: 0 0 0.9rem;
+  color: var(--ink-head);
+  font: 700 0.6875rem/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.row { display: grid; gap: 1.125rem; }
+@media (min-width: 62rem) {
+  .row--2 { grid-template-columns: 1fr 1fr; }
+  .row--wide { grid-template-columns: 1.6fr 1fr; }
+}
+
+/* --- SIGNATURE 2: the split readout ----------------------------------------
+   Integer large, fraction small, the way a meter face reads. Both halves are
+   text nodes inside one element, so assistive technology still gets "41.60"
+   and a text search still finds it. */
+.fig {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  color: var(--ink-1);
+}
+.fig__f { font-size: 0.62em; letter-spacing: -0.02em; }
+.fig__u {
+  margin-left: 0.35em;
+  color: var(--ink-2);
+  font-size: 0.4em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* --- the three streams ------------------------------------------------------
+   One card per stream, each carrying the SAME trio in the SAME order:
+   lifetime, in familiar terms, latest month. The repetition is the point — the
+   eye learns the shape once on carbon and reads electricity and water for
+   free. Each card is keyed to its lane in the trace by a 3px top rule in the
+   stream's own colour, which is meaning-bearing under SC 1.4.11 and clears 3:1
+   on both surfaces. */
+.streams { display: grid; gap: 1.125rem; grid-template-columns: 1fr; }
+@media (min-width: 58rem) {
+  .streams { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.stream { min-width: 0; margin: 0; border-top: 3px solid var(--stream, var(--rule-key)); }
+.stream--carbon { --stream: var(--viz-carbon); }
+.stream--energy { --stream: var(--viz-energy); }
+.stream--water  { --stream: var(--viz-water); }
+.stream__hd {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.stream__mark { display: block; width: 1.25rem; height: 1.25rem; flex: none; color: var(--stream); }
+.stream__n { margin: 0; font: 600 1rem/1.2 var(--sans); letter-spacing: -0.01em; }
+.trio { margin: 0; padding: 0; list-style: none; }
+.trio > li { padding: 0.95rem 1.1rem; }
+.trio > li + li { border-top: 1px solid var(--rule); }
+/* The lead reading gets the mint edge: on a page of numbers, the one that is
+   the lifetime total should not have to be found. */
+.trio > li:first-child { border-left: 3px solid var(--rule-key); }
+.badge__k {
+  margin: 0;
+  color: var(--ink-head);
+  font: 600 0.5625rem/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.badge__v { margin: 0.4rem 0 0; }
+.trio > li:first-child .badge__v .fig { font-size: clamp(1.75rem, 4.6vw, 2.25rem); }
+.badge__v .fig { font-size: 1.375rem; }
+.badge__why { margin: 0.3rem 0 0; color: var(--ink-2); font-size: 0.8125rem; line-height: 1.45; }
+.badge__src { margin: 0.4rem 0 0; color: var(--ink-3); font-size: 0.6875rem; line-height: 1.45; }
+.badge__src a { color: var(--accent); }
+/* The unit rides at a fixed fraction of whatever figure it sits beside, so the
+   readout keeps one relationship at every size on the page. */
+.badge__v .fig__u { font-size: 0.5em; }
+.trio > li:first-child .badge__v .fig__u { font-size: 0.38em; }
+.pairs dd .fig__u { font-size: 0.5em; }
+.measure__v .fig__u { font-size: 0.22em; }
+
+/* The delta chip. Direction is carried by an arrow glyph and by the sign on
+   the number, never by colour: a month that emitted more is not an error and a
+   month that emitted less is not a success, so neither gets a hue. */
+.delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-top: 0.45rem;
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  font: 600 0.6875rem/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.delta__d { font-size: 0.8em; }
+
+/* --- the per-metric calculation disclosure ---------------------------------
+   Closed by default: it answers a question rather than forming part of the
+   reading. The summary is the only affordance, so it gets a marker and a
+   pointer, and the panel is inset on the metric colour so an open disclosure
+   still reads as belonging to its own card. */
+.calc { margin: 0; border-top: 1px solid var(--rule); }
+.fold { border-top: 0; }
+.fold > summary { padding-left: 0; padding-right: 0; font-size: 0.6875rem; }
+.fold > .calc__b { padding: 1.15rem 0 0; border-left: 0; }
+.calc > summary {
+  padding: 0.7rem 1.1rem;
+  color: var(--ink-head);
+  cursor: pointer;
+  font: 700 0.625rem/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.calc[open] > summary { border-bottom: 1px solid var(--rule); }
+.calc__b { padding: 0.9rem 1.1rem 1.1rem; border-left: 3px solid var(--stream, var(--rule-key)); }
+.calc__lead { margin: 0 0 0.6rem; color: var(--ink-2); font-size: 0.8125rem; line-height: 1.55; }
+.calc__f {
+  display: block;
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--plane);
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+  color: var(--ink-1);
+  font: 600 0.6875rem/1.65 var(--mono);
+  white-space: pre;
+}
+.calc__c { margin: 0 0 0.75rem; }
+.calc__c dt {
+  margin: 0.5rem 0 0;
+  color: var(--ink-head);
+  font: 600 0.6875rem/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.calc__c dt:first-child { margin-top: 0; }
+.calc__c dt b { color: var(--ink-1); }
+.calc__c dd { margin: 0.15rem 0 0; color: var(--ink-2); font-size: 0.6875rem; line-height: 1.55; }
+.calc__note { margin: 0; color: var(--ink-2); font-size: 0.75rem; line-height: 1.55; }
+/* The paragraphs that answer "why is this like that" rather than "how is this
+   computed" — set apart so a reader scanning for the reasoning finds it. */
+.calc__why {
+  margin: 0.9rem 0 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--plane);
+  border-left: 3px solid var(--rule-key);
+  border-radius: var(--r-sm);
+  color: var(--ink-1);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+.calc__why b {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--ink-head);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* --- SIGNATURE 1: the trace ------------------------------------------------- */
+.fig-wrap { margin: 0; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.ax { fill: var(--ink-3); font-size: 11px; }
+.val { fill: var(--ink-2); font-size: 11px; font-weight: 700; }
+.lane__n { fill: var(--ink-1); font-size: 12px; font-weight: 600; }
+.lane__u { fill: var(--ink-3); font-size: 10px; }
+.base { stroke: var(--axis); stroke-width: 1; }
+/* Genuinely no data: a dashed hairline track. Never the same mark as an
+   unsettled span, which is a solid open outline. */
+.track-none { fill: none; stroke: var(--axis); stroke-width: 1; stroke-dasharray: 4 3; }
+/* --- the granularity control ------------------------------------------------
+   A native radio group in a fieldset. The APG radio-group pattern is what the
+   platform already implements for these: Tab moves focus into and out of the
+   group and lands on the checked button, the arrow keys move focus and check as
+   they go, and Space checks the focused button. Nothing here re-implements
+   that, so there is no ARIA to drift and no roving tabindex to get wrong.
+   The radios are visually replaced by their labels but stay in the
+   accessibility tree and keep focus, so the ring lands on the visible control. */
+.gran { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0 0 0.9rem; padding: 0; border: 0; }
+.gran__l {
+  padding: 0 0.6rem 0 0;
+  color: var(--ink-head);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.gran__i {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.gran__b {
+  padding: 0.28rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  cursor: pointer;
+  font: 600 0.6875rem/1.5 var(--mono);
+  letter-spacing: 0.06em;
+}
+.gran__b:hover { border-color: var(--rule-key); }
+.gran__i:checked + .gran__b {
+  border: 2px solid var(--rule-key);
+  padding: 0.22rem 0.64rem;
+  color: var(--ink-1);
+  font-weight: 700;
+}
+.gran__i:focus-visible + .gran__b { outline: 3px solid var(--ink-1); outline-offset: 2px; }
+.gran__now { margin: 0 0 1rem; color: var(--ink-2); font-size: 0.6875rem; line-height: 1.55; }
+
+/* --- the trace: smooth areas over a faint field -----------------------------
+   Each lane is a monotone-cubic curve with a gradient fill fading to nothing at
+   the baseline, over three hairlines. Hue is NOT the only channel separating
+   the series: the lanes are spatially separated small multiples, each is
+   labelled in words in the gutter, and the three inks step in lightness
+   (OKLCH L 0.451 carbon / 0.518 electricity / 0.586 water) so they stay
+   distinct in a greyscale print. */
+.grid { stroke: var(--rule); stroke-width: 1; }
+/* The verticals run the whole stack, so they are much longer than the lane
+   hairlines and would read heavier at the same weight. Held back so the field
+   stays subordinate to the data ink. */
+.grid--v { stroke-opacity: 0.7; }
+/* A month boundary inside a daily trace. It carries more ink than a bucket
+   hairline because it is STRUCTURE rather than a reading: in that view it is
+   the only vertical on the plot, and it is what turns a run of 150 days back
+   into months a reader can name. Deliberately NEUTRAL and not the brand mint —
+   mint is a data ink on this page, and a saturated vertical running the whole
+   stack reads as a fourth series rather than as the frame. */
+/* 0.85, not 0.55. When the months pack tightly the labels thin out, and an
+   unlabelled month boundary is then carried by this rule ALONE — at 0.55 it
+   flattened to roughly 1.9:1 on the sheet, which is a fact delivered only to
+   readers with good contrast sensitivity. Raised to about 3:1, where a reader
+   who needs it can actually find it. */
+.grid--m { stroke: var(--axis); stroke-opacity: 0.85; }
+/* The day ruler. Three tick heights — day, week, month — so the scale can be
+   counted rather than merely sensed. Held lighter than the month rule and much
+   lighter than any lane: this is the frame the data is read against, and a
+   ruler that competes with its own measurements is a worse ruler.
+   The opacities are the audited ones, not the first ones that looked right. At
+   0.40 the day tick flattened to about 1.6:1 on the sheet — visible to me,
+   invisible to the reader this ruler was added for, which makes the sentence
+   above a claim the mark could not keep. Raised until the day tick is roughly
+   2.2:1 and the weekly mark clears 3:1, and no further: past that the frame
+   starts arguing with the curves. */
+.tick { stroke: var(--axis); stroke-width: 1; stroke-opacity: 0.62; }
+.tick--w { stroke-opacity: 1; }
+.area { stroke: none; }
+.ln { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ln--carbon { stroke: var(--viz-carbon); }
+.ln--energy { stroke: var(--viz-energy); }
+.ln--water  { stroke: var(--viz-water); }
+/* A surface-coloured ring round every sample, so a dot stays readable where the
+   curve passes under it. */
+.dot { stroke: var(--surface); stroke-width: 1.5; }
+.dot--carbon { fill: var(--viz-carbon); }
+.dot--energy { fill: var(--viz-energy); }
+.dot--water  { fill: var(--viz-water); }
+.gs--top { stop-opacity: 0.28; }
+.gs--bot { stop-opacity: 0; }
+.gs--carbon { stop-color: var(--viz-carbon); }
+.gs--energy { stop-color: var(--viz-energy); }
+.gs--water  { stop-color: var(--viz-water); }
+
+.m-carbon  { fill: var(--viz-carbon); }
+.m-model   { fill: var(--viz-model); }
+.m-energy  { fill: var(--viz-energy); }
+.m-water   { fill: var(--viz-water); }
+.m-settled { fill: var(--viz-settled); }
+/* The unsettled span: an OPEN track. Filled-versus-open is the channel that
+   survives greyscale, colour-vision deficiency and forced colours, where a
+   hatch fill collapses. 2px because SC 1.4.11's own note warns anti-aliasing
+   renders thin shapes fainter than their declared colour. */
+.m-open { fill: none; stroke: var(--viz-carbon); stroke-width: 2; }
+.bound line { stroke: var(--ink-1); stroke-width: 2; }
+.bound text { fill: var(--ink-1); font-size: 11px; font-weight: 700; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.75rem; margin-top: 0.9rem; }
+.legend__i { display: flex; gap: 0.5rem; align-items: center; font-size: 0.8125rem; color: var(--ink-2); }
+/* Legend swatches are drawn as SVG, not as CSS backgrounds, for two reasons:
+   the swatch is then literally the same mark as the chart (solid span, open
+   track), and no chart colour ever appears as a background anywhere in this
+   stylesheet — which is what keeps the "mint is line-work, never a field" rule
+   mechanically testable. */
+.legend__sw { display: block; width: 0.9rem; height: 0.9rem; flex: none; }
+.legend__v { font: 700 0.8125rem/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-1); }
+
+/* --- the measure ------------------------------------------------------------
+   The headline balance, read as a filled measure: the settled span solid, the
+   unsettled remainder open, and a caliper rule dropped where they meet. */
+.measure__v { display: block; }
+.measure__v .fig { font-size: clamp(2.5rem, 7.5vw, 3.75rem); }
+.measure__eq {
+  margin: 0.55rem 0 1.25rem;
+  color: var(--ink-2);
+  font: 400 0.8125rem/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- below the line -------------------------------------------------------- */
+.memo__list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.7rem; }
+.memo__item { display: grid; grid-template-columns: 1.125rem 1fr; gap: 0.7rem; align-items: start; }
+.memo__mark { width: 1.125rem; height: 1.125rem; margin-top: 0.2rem; }
+.memo__label { font-size: 0.8125rem; }
+.memo__v { font: 700 0.8125rem/1.6 var(--mono); font-variant-numeric: tabular-nums; }
+.memo__why { display: block; color: var(--ink-2); font-size: 0.75rem; }
+/* Below-the-line marks carry SHAPE, not hue: a dashed outline for prevention,
+   a heavy ring for unverified. Both clear 3:1 against the sheet. */
+.mk rect { fill: none; stroke-width: 2; }
+.mk line { stroke-width: 2; }
+.mk--prev rect { stroke: var(--ink-3); stroke-dasharray: 3 2; }
+.mk--prev line { stroke: var(--ink-3); }
+.mk--unv rect { stroke: var(--critical); }
+.mk--unv line { stroke: var(--critical); stroke-linecap: round; }
+
+/* --- callout --------------------------------------------------------------- */
+.crow {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--plane);
+  border-left: 4px solid var(--rule-key);
+  border-radius: var(--r-sm);
+}
+.crow__tag {
+  flex: none;
+  color: var(--accent);
+  font: 700 0.625rem/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.crow p { margin: 0; color: var(--ink-2); font-size: 0.8125rem; }
+
+/* --- figure pairs (dollars, reported-separately) ---------------------------- */
+.pairs { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; margin: 0; }
+.pairs > div { min-width: 0; padding: 0.85rem 0.95rem; border: 1px solid var(--rule); border-radius: var(--r-md); }
+.pairs dt {
+  margin: 0;
+  color: var(--ink-head);
+  font: 600 0.5625rem/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.pairs dd { margin: 0.4rem 0 0; }
+.pairs dd .fig { font-size: 1.375rem; }
+.pairs dd small { display: block; margin-top: 0.3rem; color: var(--ink-2); font: 400 0.75rem/1.4 var(--sans); }
+.owed--neg .fig { color: var(--accent); }
+
+details { margin-top: 1.25rem; }
+summary {
+  color: var(--ink-head);
+  cursor: pointer;
+  font: 700 0.6875rem/1.6 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* --- tables ---------------------------------------------------------------- */
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+caption { margin-bottom: 0.65rem; color: var(--ink-2); font-size: 0.75rem; text-align: left; }
+th, td { padding: 0.55rem 0.75rem; text-align: left; }
+th {
+  color: var(--ink-head);
+  font: 700 0.625rem/1.6 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+thead th { border-bottom: 2px solid var(--rule-key); }
+tbody th { font-weight: 600; letter-spacing: 0; text-transform: none; font-size: 0.8125rem; }
+tbody tr + tr > * { border-top: 1px solid var(--rule); }
+th:first-child, td:first-child { padding-left: 0; }
+.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* A SHA-256 is 64 characters and will push the receipt column off the card.
+   Cap it and let it wrap: two short lines beat a horizontal scroll on a page
+   whose whole point is being printed and filed. */
+.hash { max-width: 15rem; font-family: var(--mono); font-size: 0.625rem; line-height: 1.5; word-break: break-all; }
+.td__note { display: block; color: var(--ink-2); font-size: 0.6875rem; white-space: nowrap; }
+tfoot th, tfoot td { border-top: 2px solid var(--rule-key); font-weight: 700; }
+td a { color: var(--accent); }
+
+.badge {
+  display: inline-block;
+  padding: 0.06rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: var(--r-sm);
+  font: 700 0.625rem/1.6 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.badge--ok { color: var(--accent); }
+.badge--no { color: var(--critical); border-width: 2px; }
+
+/* --- the empty books --------------------------------------------------------
+   A fresh ledger has no purchases, and this is the section a user opens while
+   holding a receipt and wondering where it goes. Rendering a blank space
+   between two headings is how that user concludes the feature does not exist,
+   so the empty state is a designed object rather than an absence: it names
+   what will appear here, and it gives the exact command that puts it there.
+   The steps are numbered because they genuinely are a sequence — record the
+   purchase, then add the retirement ID when the registry issues it. */
+.start {
+  margin: 0 0 0.5rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--rule-key);
+  border-radius: var(--r-md);
+}
+.start__k {
+  margin: 0;
+  color: var(--ink-3);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.start__t { margin: 0.15rem 0 0; font: 600 1.0625rem/1.3 var(--sans); letter-spacing: -0.01em; }
+.start__d { margin: 0.5rem 0 0; max-width: 44rem; color: var(--ink-2); font-size: 0.8125rem; }
+.start__steps { margin: 1rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.85rem; counter-reset: step; }
+.start__steps > li { display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.75rem; align-items: start; }
+.start__steps > li::before {
+  counter-increment: step;
+  content: counter(step);
+  display: block;
+  padding-top: 0.05rem;
+  border-top: 2px solid var(--rule-key);
+  color: var(--ink-head);
+  font: 700 0.75rem/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.start__what { margin: 0; color: var(--ink-1); font-size: 0.8125rem; }
+.cmd {
+  display: block;
+  margin: 0.35rem 0 0;
+  padding: 0.5rem 0.7rem;
+  background: var(--plane);
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+  color: var(--ink-1);
+  font: 600 0.75rem/1.7 var(--mono);
+  white-space: pre;
+}
+.start__note { margin: 1rem 0 0; color: var(--ink-2); font-size: 0.75rem; line-height: 1.55; }
+
+/* --- the receipt picker ----------------------------------------------------
+   The primary way to file a receipt. It cannot save anything — the page is a
+   static file — so it does the half it honestly can, on this machine only:
+   take the file, hash it, and hand back the command that records it. */
+.pick {
+  margin: 0 0 1.1rem;
+  padding: 1.15rem 1.25rem;
+  background: var(--surface);
+  border: 2px dashed var(--rule-key);
+  border-radius: var(--r-md);
+  text-align: center;
+}
+.pick--over { background: var(--plane); border-style: solid; }
+/* The input is hidden from sight but NOT from the accessibility tree or the
+   keyboard: the label is its own control, and focus lands on the real input,
+   so clip-and-position rather than display:none. */
+.pick__i {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.pick__btn {
+  display: inline-block;
+  padding: 0.5rem 1.1rem;
+  border: 2px solid var(--ink-1);
+  border-radius: var(--r-sm);
+  color: var(--ink-1);
+  cursor: pointer;
+  font: 700 0.75rem/1.4 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pick__btn:hover { background: var(--plane); }
+.pick__i:focus-visible + .pick__hint, .pick__i:focus-visible ~ .pick__hint { text-decoration: underline; }
+/* The label is the visible control, so the ring has to land on it when the
+   real input takes focus. */
+.pick__i:focus-visible + .pick__btn,
+.pick:has(.pick__i:focus-visible) .pick__btn { outline: 3px solid var(--ink-1); outline-offset: 2px; }
+.pick__hint { margin: 0.6rem 0 0; color: var(--ink-2); font-size: 0.75rem; }
+.pick__out:empty { display: none; }
+.pick__out {
+  margin: 0 0 1.25rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--rule-key);
+  border-radius: var(--r-md);
+}
+.pick__k {
+  margin: 0 0 0.5rem;
+  color: var(--ink-head);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.pick__meta { display: grid; grid-template-columns: 5.5rem 1fr; gap: 0.25rem 0.75rem; margin: 0 0 1.1rem; }
+.pick__meta dt { color: var(--ink-3); font: 600 0.6875rem/1.5 var(--mono); }
+.pick__meta dd { margin: 0; color: var(--ink-1); font: 600 0.6875rem/1.5 var(--mono); overflow-wrap: anywhere; }
+.pick__hash { font-size: 0.625rem !important; word-break: break-all; }
+.pick__path { margin: 0.5rem 0 0; color: var(--ink-2); font-size: 0.6875rem; line-height: 1.55; }
+.pick__act { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0.9rem 0 0; }
+.pick__copy {
+  padding: 0.35rem 0.8rem;
+  background: var(--surface);
+  border: 2px solid var(--ink-1);
+  border-radius: var(--r-sm);
+  color: var(--ink-1);
+  cursor: pointer;
+  font: 700 0.6875rem/1.5 var(--mono);
+  letter-spacing: 0.06em;
+}
+.pick__copy:hover { background: var(--plane); }
+.pick__said { color: var(--accent); font: 600 0.6875rem/1.5 var(--mono); }
+.pick__warn {
+  margin: 0.9rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-1);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+.start__how { border-top: 1px solid var(--rule); margin-top: 1rem; }
+.start__how > summary { padding-left: 0; padding-right: 0; }
+.start__how .calc__b { padding-left: 0.85rem; padding-right: 0; border-left-color: var(--rule); }
+
+/* A receipt is the reason this section exists, so the download is an action
+   with an edge around it, not a word in the ninth column. */
+.roll {
+  margin: 0 0 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--rule-key);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+.roll b { color: var(--ink-1); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.dl {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--rule-key);
+  border-radius: var(--r-sm);
+  color: var(--accent);
+  font: 700 0.6875rem/1.6 var(--mono);
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dl:hover { text-decoration: underline; text-underline-offset: 0.18em; }
+
+/* --- the giving briefing ----------------------------------------------------
+   Grouped by what a gift actually DOES to the balance above, because that is
+   the only grouping a reader of this page needs: one tier settles it, one
+   prevents a future emission and cannot settle it, and five belong to a
+   different budget entirely. Inside a card the order is fixed — what it does,
+   what a tonne costs if anything, the honest verdict, then the research that
+   backs both. */
+.tier { margin: 0 0 2rem; }
+.tier:last-child { margin-bottom: 0; }
+.tier__hd { margin: 0 0 0.9rem; padding-left: 0.85rem; border-left: 3px solid var(--rule-key); }
+.tier__t { margin: 0; color: var(--ink-1); font: 600 1rem/1.3 var(--sans); }
+.tier__d { margin: 0.25rem 0 0; max-width: 44rem; color: var(--ink-2); font-size: 0.8125rem; }
+.orgs { margin: 0; padding: 0; list-style: none; display: grid; gap: 1.125rem; }
+@media (min-width: 62rem) {
+  .orgs--multi { grid-template-columns: 1fr 1fr; }
+}
+.org { min-width: 0; padding: 0; overflow: hidden; }
+.org__b { padding: 1.15rem 1.25rem; }
+/* The photograph runs the full width of the card and sets its own height by
+   ratio, so five cards keep one silhouette whatever the column width. It is
+   the first thing in the card, above the name — at this size it is the card's
+   opening statement rather than a decoration in the corner. */
+.org__banner {
+  display: block;
+  width: 100%;
+  aspect-ratio: 8 / 3;
+  max-height: 17rem;
+  margin: 0;
+  border-bottom: 1px solid var(--rule);
+}
+.org__banner img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* Two subjects have no public-domain federal photograph in existence. Holding
+   photo-sized space open for one produced an enormous empty plate, so those
+   cards simply have no banner and take the tier rule as their top edge. */
+.org--plain { border-top: 3px solid var(--rule-key); }
+.org__area {
+  display: block;
+  color: var(--ink-3);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+/* Visually hidden, still in the accessibility tree. CLIPPED and never
+   display:none or visibility:hidden — either of those removes the node from the
+   tree, and therefore from the accessible-name computation, which is the one
+   job this class has. */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.org__n { margin: 0.2rem 0 0; font: 600 1.0625rem/1.25 var(--sans); letter-spacing: -0.01em; }
+.org__n small { display: block; margin-top: 0.1rem; color: var(--ink-3); font: 400 0.75rem/1.4 var(--sans); }
+/* The price signal is the single most decision-relevant fact about an
+   organisation, so it is a distinct object rather than a sentence: a mono
+   figure on a ruled chip, with the caveat underneath it in prose. */
+.org__price {
+  display: inline-block;
+  margin: 0.75rem 0 0;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--rule-key);
+  border-radius: var(--r-sm);
+  color: var(--ink-1);
+  font: 700 0.75rem/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.org__pn { margin: 0.4rem 0 0; color: var(--ink-2); font-size: 0.75rem; line-height: 1.5; }
+.org__does { margin: 0.75rem 0 0; color: var(--ink-2); font-size: 0.8125rem; }
+.org__verdict {
+  margin: 0.85rem 0 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--plane);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--r-sm);
+  color: var(--ink-1);
+  font-size: 0.8125rem;
+}
+.org__verdict b {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--ink-head);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.org__update { margin: 0.85rem 0 0; color: var(--ink-2); font-size: 0.75rem; line-height: 1.55; }
+.org__update b {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--ink-head);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+/* 0.5rem, not 0.35rem. Two stacked 15px-tall links at the smaller gap sit 23.7px
+   centre to centre, and SC 2.5.8 Target Size (Minimum) asks that undersized
+   targets be spaced so a 24px circle centred on each does not intersect its
+   neighbour's. Missing by 0.3px is still missing; the Inline exception arguably
+   covers the first item in each list, which begins mid-sentence after "Evidence",
+   but it does not obviously cover the ones that are nothing but a link. */
+.org__links { margin: 0.9rem 0 0; padding: 0.75rem 0 0; border-top: 1px solid var(--rule); list-style: none; display: grid; gap: 0.5rem; }
+.org__links li { font-size: 0.75rem; line-height: 1.5; }
+.org__links b {
+  color: var(--ink-head);
+  font: 700 0.5625rem/1.6 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* --- methodology ----------------------------------------------------------- */
+.meth { margin: 0; display: grid; gap: 1.5rem; }
+@media (min-width: 62rem) { .meth { grid-template-columns: 1fr 1fr; } }
+.meth__t { margin: 0; font: 700 0.8125rem/1.4 var(--mono); letter-spacing: 0.01em; }
+.meth__d { margin: 0.35rem 0 0; color: var(--ink-2); font-size: 0.8125rem; }
+.meth__f {
+  display: block;
+  margin: 0.5rem 0 0;
+  padding: 0.55rem 0.75rem;
+  background: var(--plane);
+  border-left: 3px solid var(--rule-key);
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+  font: 600 0.75rem/1.7 var(--mono);
+  white-space: pre;
+}
+
+/* --- footer ---------------------------------------------------------------- */
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.75rem;
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 2.5rem;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+}
+.foot time { font-family: var(--mono); }
+
+/* --- reflow ----------------------------------------------------------------
+   SC 1.4.10 Reflow: "Content can be presented without loss of information or
+   functionality, and without requiring scrolling in two dimensions for:
+   Vertical scrolling content at a width equivalent to 320 CSS pixels" (EN 301
+   549 9.1.4.10 carries the same table). Grid and flex items default to
+   min-width:auto, so one wide formula, one long hash or one table sets a
+   min-content floor and drags the whole layout past 320px. Zeroing that floor
+   is what lets the scrollable wrappers actually scroll. */
+.row > *, .streams > *, .pairs > *, .meta > *, .meth > *, .orgs > *,
+.flag > *, .crow > *, .memo__item > *, .bar__in > *, .trio > * { min-width: 0; }
+.tw, .chart, .meth__f { max-width: 100%; }
+.measure__eq, .badge__why, .org a, .org__verdict, .foot, .brand__t,
+.credits__list a { overflow-wrap: anywhere; }
+/* The colophon had no styling at all, so it rendered with the UA list indent and
+   default wrapping — and one Wikimedia credit carries a 32-character hex id with
+   no break opportunity in it, which pushed the whole page to 353px at a 320px
+   viewport. That is SC 1.4.10 Reflow: scrolling in two dimensions, on every line
+   of the document, because of one filename. It is also the printed state, since
+   the print guard force-opens every disclosure. */
+.credits__list {
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 34rem) {
+  .bar__in { padding: 0.7rem 0.9rem; }
+  .page { padding: 0.9rem 0.9rem 2rem; }
+  .foot { padding: 1rem 0.9rem 2rem; }
+  .card__b, .org__b { padding-left: 0.9rem; padding-right: 0.9rem; }
+  .trio > li, .stream__hd { padding-left: 0.9rem; padding-right: 0.9rem; }
+  .meta { margin-left: 0; width: 100%; }
+  .pairs { grid-template-columns: 1fr; }
+}
+
+/* Nothing on this page animates by default. The guard stands anyway, so any
+   future transition inherits it. Media Queries 5 defines the reduce keyword as
+   the signal "that user has notified the system that they prefer an interface
+   that removes or replaces the types of motion-based animation that either
+   trigger discomfort for those with vestibular motion sensitivity, or
+   distraction for those with attention deficits." */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- print: this is a tax document, so it has to print like one ------------- */
+@media print {
+  :root {
+    /* Print keeps the KEY mint rules — identity, and they survive a colour
+       printer; on a mono printer they still render as a grey line. Decorative
+       hairlines drop to neutral grey: a 1.61:1 pale mint is at the edge of
+       what a printer resolves. Inset blocks lose their fill and the inks go to
+       true black for toner. */
+    --plane: #fff; --surface: #fff;
+    --rule: #b7b7b7; --rule-key: #0f9563;
+    --ink-1: #000; --ink-2: #222; --ink-3: #444; --accent: #04502f;
+  }
+  body { font-size: 10pt; }
+  .page, .bar__in, .foot { max-width: none; padding: 0; }
+  .bar { position: static; border-bottom-width: 2px; }
+  .card { border: 0; border-radius: 0; box-shadow: none; }
+  .streams, .row, .orgs, .meth { display: block; }
+  .stream, .card, .org { margin-top: 0.6rem; }
+  .card__b, .org__b { padding-left: 0; padding-right: 0; }
+  .org { border: 0; border-top: 1px solid var(--rule); border-radius: 0; }
+  .org__banner { max-height: 4cm; }
+  .skip { display: none; }
+  details { display: block; }
+  /* The summary is PRINTED, not hidden. Every disclosure is force-opened for
+     print, so hiding the summary stripped the heading off its own content and
+     left the derivation sitting under nothing. On a page whose purpose is to be
+     filed and read back later, the label is the part you need most. */
+  details > summary {
+    display: block;
+    list-style: none;
+    margin-bottom: 0.4rem;
+    color: var(--ink-head);
+    font: 700 0.625rem/1.6 var(--mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  .block, .card, .org, .stream, tr { break-inside: avoid; }
+  #audit { break-before: page; }
+  /* A printed audit trail has to carry its evidence: expand every link. */
+  #audit a[href^="https"]::after,
+  #give a[href^="https"]::after,
+  .badge__src a::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    word-break: break-all;
+  }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#report">Skip to the record</a>
+
+<header class="bar">
+  <div class="bar__in">
+    <div class="brand">
+      <!-- A potted ficus: the thing the project is named after, drawn rather
+           than alluded to. It replaced a bar-chart glyph that competed with the
+           real charts below it — a mark that looks like data reads as data.
+           Built for 24px first: five broad leaves and a solid pot, no outlines
+           and no detail finer than a pixel at that size. The two mint tones
+           carry the depth (soft behind, full in front) and the pot is the only
+           dark mass, so the silhouette survives greyscale and forced colours. -->
+      <svg class="brand__mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M11.6,14.4Q5.32,16.26 2.4,10.4Q8.68,8.54 11.6,14.4Z" fill="var(--mint-soft)"></path>
+        <path d="M12 18.2c0-3.7.1-6.6.3-9.2" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"></path>
+        <g fill="var(--rule-key)">
+          <path d="M12.4,13.4Q15.32,7.54 21.6,9.4Q18.68,15.26 12.4,13.4Z"></path>
+          <path d="M11.6,11.6Q4.83,12.17 3.1,5.6Q9.87,5.03 11.6,11.6Z"></path>
+          <path d="M12.4,10.2Q14.13,3.63 20.9,4.2Q19.17,10.77 12.4,10.2Z"></path>
+          <path d="M12,9.2Q8.78,5.7 12,2.2Q15.22,5.7 12,9.2Z"></path>
+        </g>
+        <path d="M7.5 18.4h9l-.85 3.1a1.2 1.2 0 0 1-1.16.88h-4.98a1.2 1.2 0 0 1-1.16-.88z" fill="var(--ink-head)"></path>
+        <rect x="6.5" y="17" width="11" height="2.1" rx="1.05" fill="var(--ink-2)"></rect>
+      </svg>
+      <div>
+        <h1 class="brand__t">Ficus</h1>
+        <p class="brand__sub">Carbon station &middot; Claude Code</p>
+      </div>
+    </div>
+    <dl class="meta">
+      <div><dt>Period</dt><dd id="m-period">&mdash;</dd></div>
+      <div><dt>Sessions</dt><dd id="m-sessions">&mdash;</dd></div>
+      <div><dt>Updated</dt><dd><time id="m-issued" datetime=""></time></dd></div>
+    </dl>
+  </div>
+</header>
+
+<div class="page">
+  <main id="report" tabindex="-1">
+
+    <p class="flag"><span class="flag__tag">Estimate</span><span id="caveat"></span></p>
+
+    <!-- 1. THE THREE STREAMS ------------------------------------------------->
+    <section class="block" id="streams" aria-labelledby="h-streams">
+      <div class="block__hd">
+        <span class="block__eyebrow">Lifetime</span>
+        <h2 class="block__t" id="h-streams">What this account has used</h2>
+        <p class="block__sub">One act, recorded as three streams. Each carries the same three readings: the
+          lifetime total, what that total is comparable to, and how the latest month compares with the one
+          before it. That last figure is identical on all three cards, and that is not a fault &mdash; carbon
+          and water are derived from energy by fixed published factors, so the three always move together.</p>
+      </div>
+      <div class="streams" id="stream-cards"></div>
+    </section>
+
+    <!-- 2. THE TRACE ---------------------------------------------------------->
+    <section class="block" id="trace" aria-labelledby="h-trace">
+      <div class="block__hd">
+        <span class="block__eyebrow">Day by day</span>
+        <h2 class="block__t" id="h-trace">Usage over time</h2>
+        <p class="block__sub">The three streams on one shared time axis, so a period reads across all three at once.
+          Grouped by month, the trace still draws every single day and rules where each month begins.</p>
+      </div>
+      <div class="card"><div class="card__b">
+        <div id="gran-host"></div>
+        <div id="trace-body"></div>
+        <div id="trace-table"></div>
+        <p class="note" style="margin-top:1.15rem"><strong>The three lanes are congruent by construction.</strong>
+          Energy is the physical quantity; carbon and water are derived from it by the fixed published factors in
+          the derivation below, so the shapes have to match. Drawing them together shows that rather than hiding
+          it &mdash; what changes between lanes is the scale and the unit, never the shape.</p>
+      </div></div>
+    </section>
+
+    <!-- 3. THE MEASURE --------------------------------------------------------->
+    <section class="block" id="balance" aria-labelledby="h-balance">
+      <div class="block__hd">
+        <span class="block__eyebrow">As of today</span>
+        <h2 class="block__t" id="h-balance">What is still outstanding</h2>
+        <p class="block__sub">Emitted minus verified removal. Prevention credits and unverified purchases are
+          recorded below the line, where they belong.</p>
+      </div>
+      <div class="row row--wide">
+        <div class="card"><div class="card__b">
+          <p class="measure__v" id="bal-value"></p>
+          <p class="measure__eq" id="bal-eq"></p>
+          <figure class="fig-wrap">
+            <svg class="chart" id="c-measure" viewBox="0 0 720 66" role="img" aria-labelledby="measure-t" aria-describedby="measure-d">
+              <title id="measure-t">Lifetime emissions, settled and unsettled</title>
+              <desc id="measure-d"></desc>
+              <g id="measure-marks"></g>
+            </svg>
+            <figcaption class="legend" id="measure-legend"></figcaption>
+          </figure>
+        </div></div>
+        <div class="card"><div class="card__b">
+          <p class="card__t">Below the line</p>
+          <p class="note">Recorded, not settled. Both are real purchases; neither settles a removal debt.</p>
+          <ul class="memo__list" id="memo-list"></ul>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- 4. THE DOLLAR LEDGER ---------------------------------------------------->
+    <section class="block" id="dollars" aria-labelledby="h-dollars">
+      <div class="block__hd">
+        <span class="block__eyebrow">Cost to clear</span>
+        <h2 class="block__t" id="h-dollars">Dollars, kept separately from the tonnes</h2>
+      </div>
+      <div class="card"><div class="card__b">
+        <div id="crow-host"></div>
+        <dl class="pairs" id="pairs"></dl>
+        <p class="note" style="margin-top:1.25rem"><strong>Overall</strong> prices every gram emitted at the removal
+          rate. <strong>Contributed</strong> is every dollar given &mdash; offset purchases and donations alike,
+          counted 1:1, with no attempt to convert a donation into tonnes. <strong>Owed</strong> is the difference,
+          and it is never clamped at zero.</p>
+        <p class="note" id="rate-note"></p>
+      </div></div>
+    </section>
+
+    <!-- 5. BREAKDOWN ------------------------------------------------------------>
+    <section class="block" id="breakdown" aria-labelledby="h-breakdown">
+      <div class="block__hd">
+        <span class="block__eyebrow">Lifetime</span>
+        <h2 class="block__t" id="h-breakdown">Where it came from, and what is reported apart</h2>
+      </div>
+      <div class="row row--2">
+        <div class="card" id="by-model"><div class="card__b">
+          <p class="card__t">Operational <span class="cs">CO2e</span> by model family</p>
+          <div id="model-body"></div>
+        </div></div>
+        <div class="card" id="apart"><div class="card__b">
+          <p class="card__t">Reported separately</p>
+          <dl class="pairs" id="tiles"></dl>
+          <p class="note" style="margin-top:1.25rem">Embodied <span class="cs">CO2e</span> is the amortised hardware
+            share, reported separately and never folded into operational. API value is what this work would have
+            cost at list price, not money spent.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- 6. RECEIPTS AND BOOKS ----------------------------------------------------
+         Named for the thing a user comes looking for. "Audit trail" is what it
+         is; "Receipts" is what it is called when you are holding a PDF and
+         wondering where to put it. -->
+    <section class="block" id="audit" aria-labelledby="h-audit">
+      <div class="block__hd">
+        <span class="block__eyebrow">Tax year</span>
+        <h2 class="block__t" id="h-audit">Receipts &amp; books</h2>
+        <p class="block__sub">Every offset purchase and every donation, with the receipt attached.</p>
+      </div>
+      <div class="card"><div class="card__b">
+        <p class="note">Everything a tax year needs, in one place: who paid, what was bought, what it cost, and the
+          proof. Each purchase carries the <strong>SHA-256</strong> of its receipt as recorded at filing time, the
+          <strong>registry retirement ID</strong> where one was issued, and the receipt itself as a download built
+          from the stored bytes &mdash; no server, no link to rot. Each payer keeps separate
+          books<span id="payer-names"></span>.</p>
+        <p class="note">For an accountant-ready CSV, one file per payer with a totals row, run
+          <strong>scripts/offset-export.sh --tax-year YYYY</strong> (add <strong>--payer NAME</strong> to narrow
+          it). The export records; it does not give tax advice &mdash; classify donation-versus-expense with your CPA.</p>
+        <h3 class="sub__h">By payer</h3>
+        <div id="payer-body"></div>
+        <h3 class="sub__h">Offset purchases</h3>
+        <div id="receipt-roll"></div>
+        <div id="offsets-body"></div>
+        <h3 class="sub__h">Donations</h3>
+        <div id="donations-body"></div>
+      </div></div>
+    </section>
+
+    <!-- 7. THE GIVING BRIEFING --------------------------------------------------->
+    <section class="block" id="give" aria-labelledby="h-give">
+      <div class="block__hd">
+        <span class="block__eyebrow">Before you give</span>
+        <h2 class="block__t" id="h-give">Seven destinations, and what each one actually does</h2>
+        <p class="block__sub">Grouped by what a gift does to the balance above, because that is the only grouping
+          this page needs. Every claim below is data, not copy: it lives in
+          <strong>data/giving-shortlist.json</strong> with the research document each sentence came from recorded
+          alongside it. Where the honest carbon verdict is unfavourable, it is printed rather than smoothed over.</p>
+      </div>
+      <div id="give-body"></div>
+    </section>
+
+    <!-- 8. DERIVATION ------------------------------------------------------------>
+    <section class="block" id="method" aria-labelledby="h-method">
+      <div class="block__hd">
+        <span class="block__eyebrow">How these are made</span>
+        <h2 class="block__t" id="h-method">Derived, not measured</h2>
+      </div>
+      <div class="card"><div class="card__b">
+        <p class="note">Every figure on this page is derived from stored token counts by a published factor. Nothing
+          is measured. Anthropic publishes no per-query energy data, so the honest description of all of it is
+          <strong>order-of-magnitude, roughly &plusmn;50%</strong>. Trends and relative comparisons are meaningful;
+          absolute values are indicative.</p>
+        <!-- Reference material, not part of the reading, so it folds away. It stays
+             in THIS file rather than becoming a second page: the value of this
+             artifact is that it is one self-contained thing you can archive, print
+             or hand to an accountant, and a second file drifts. It prints in full
+             regardless of whether it is open on screen — see the print guard. -->
+        <details class="calc fold" id="meth-fold">
+          <summary>How these are made &mdash; derived, not measured</summary>
+          <div class="calc__b">
+            <dl class="meth" id="meth"></dl>
+            <p class="note" style="margin-top:1.5rem">Fuller derivations, the uncertainty bands per model family, and
+              the cross-check gate against an independent estimator are in <strong>METHODOLOGY.md</strong>.</p>
+            <div id="credits"></div>
+          </div>
+        </details>
+      </div></div>
+    </section>
+
+  </main>
+</div>
+
+<footer class="foot">
+  <span>Updated <time id="gen" datetime=""></time></span>
+  <span>Recomputed from stored token counts. No figure here is a measurement.</span>
+</footer>
+<script>

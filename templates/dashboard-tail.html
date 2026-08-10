@@ -1,0 +1,1384 @@
+/* Renders the station record from DATA. Every value reaches the DOM as a text
+   node (Node.append with a string, or textContent) — never as parsed markup —
+   so no ledger string and no shortlist sentence can inject HTML. The only
+   attributes ever built from data are href (set through setAttribute, never
+   parsed) and download.
+
+   Charts are inline SVG built through the namespace read off the static <svg>
+   in the skeleton, which keeps the URL of the SVG namespace out of this file:
+   the page must carry zero external references and open over file:// with the
+   network off. */
+(function () {
+  "use strict";
+  var doc = document, measure = doc.getElementById("c-measure"), NS = measure.namespaceURI;
+
+  function make(ns, tag, attrs, kids) {
+    var n = ns ? doc.createElementNS(ns, tag) : doc.createElement(tag), k;
+    for (k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+    (kids || []).forEach(function (c) { if (c !== null && c !== undefined) n.append(c); });
+    return n;
+  }
+  function h(tag, attrs) { return make(null, tag, attrs, [].slice.call(arguments, 2)); }
+  function s(tag, attrs) { return make(NS, tag, attrs, [].slice.call(arguments, 2)); }
+  function set(id, text) { doc.getElementById(id).textContent = text; }
+  function num(v, d) {
+    var x = Number(v) || 0, p = Math.abs(x).toFixed(d).split(".");
+    return (x < 0 ? "−" : "") + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (p[1] ? "." + p[1] : "");
+  }
+  function usd(v) { var x = Number(v) || 0; return (x < 0 ? "−$" : "$") + num(Math.abs(x), 2); }
+  function width(node) { return Math.max(280, Math.round(node.getBoundingClientRect().width) || 720); }
+
+  /* SIGNATURE — the split readout. Integer large, fraction small, the way a
+     meter face reads. Both halves live inside one element as plain text, so a
+     screen reader still announces "41.60" and a find-in-page still matches. */
+  function fig(v, unit) {
+    var p = String(v).split("."), n = h("span", { class: "fig" }, p[0]);
+    if (p.length > 1) n.append(h("span", { class: "fig__f" }, "." + p[1]));
+    if (unit) n.append(h("span", { class: "fig__u" }, unit));
+    return n;
+  }
+
+  var T = DATA.totals || {}, OS = DATA.offset_state || {}, EQ = DATA.equivalences || {};
+  var C = DATA.constants || {}, COST = DATA.cost || {}, TR = DATA.trend || {};
+  var F = DATA.formulas || {};
+  var months = DATA.monthly || [], models = DATA.by_model || [];
+  /* The chart switches granularity; the reading trios and the period chip stay
+     monthly, because "latest month" is a claim about months. */
+  var SERIES = DATA.series || {};
+  var GRANS = [["day", "Daily"], ["week", "Weekly"], ["month", "Monthly"], ["year", "Yearly"]];
+  var granOK = GRANS.filter(function (g) { return (SERIES[g[0]] || {}).ok; });
+  var curG = (SERIES.month || {}).ok ? "month" : (granOK.length ? granOK[granOK.length - 1][0] : "");
+  /* THE MONTH VIEW IS DRAWN AT DAILY RESOLUTION. A month total is the figure
+     people ask for, and it hides everything that produced it: one fourteen-hour
+     Tuesday and a quiet fortnight land in the same bin at the same height. So
+     the month view plots one point per DAY and marks each month START with a
+     rule and a label — the months are the structure, the days are the data. The
+     lane therefore scales to the biggest single DAY, and the figures table under
+     the chart still totals the months, so the monthly reading is not lost.
+
+     This is a RESOLUTION SWAP, not a second scale. Drawing daily points against
+     monthly totals in one lane would need two y-axes for one measure, and a
+     dual scale is the one thing this page refuses everywhere.
+
+     Past DAY_DETAIL_MAX days a day is narrower than the hairline drawn for it,
+     so the view falls back to month totals — with the reason printed on the
+     page rather than the detail quietly disappearing. */
+  var DAY_DETAIL_MAX = 1100;
+  function dayRows() { return ((SERIES.day || {}).rows) || []; }
+  function monthDetail() {
+    var d = dayRows().length;
+    return curG === "month" && d >= 3 && d <= DAY_DETAIL_MAX;
+  }
+  /* What the TRACE plots. */
+  function chartRows() { return monthDetail() ? dayRows() : bucketRows(); }
+  /* What the FIGURES TABLE lists: always the selected bucket, so "Monthly"
+     still hands over month totals however finely the trace is drawn. */
+  function bucketRows() { return ((SERIES[curG] || {}).rows) || []; }
+  /* Where each month opens inside a daily series: its index, and its key. */
+  function monthStarts(rows) {
+    var out = [], prev = "", i, k;
+    for (i = 0; i < rows.length; i++) {
+      k = String(rows[i].b).slice(0, 7);
+      if (k !== prev) { out.push({ i: i, key: k }); prev = k; }
+    }
+    return out;
+  }
+  function granLabel(g) {
+    for (var i = 0; i < GRANS.length; i++) if (GRANS[i][0] === g) return GRANS[i][1];
+    return g;
+  }
+  /* Axis labels: the bucket key is already a sortable date string, so the only
+     job here is dropping the parts that repeat across every tick. */
+  function fmtBucket(b, wide) {
+    b = String(b);
+    if (curG === "year") return b;
+    if (curG === "month") return wide ? b : b.slice(5);
+    return wide ? b.slice(5) : b.slice(8);
+  }
+  var buys = DATA.offsets || [], gifts = DATA.donations || [];
+  var GIVE = DATA.giving || { tiers: [], orgs: [] };
+  var emitted = (Number(T.co2_g) || 0) / 1000;
+  var removal = Number(OS.removal_verified_kg) || 0;
+  var settled = Math.min(removal, emitted), unsettled = Math.max(emitted - removal, 0);
+
+  /* --- station header ------------------------------------------------------ */
+  set("caveat", DATA.caveat || "");
+  [["gen", DATA.generated_at], ["m-issued", DATA.generated_at]].forEach(function (p) {
+    var n = doc.getElementById(p[0]);
+    n.textContent = p[1] || "";
+    n.setAttribute("datetime", p[1] || "");
+  });
+  set("m-period", months.length
+    ? (months.length === 1 ? String(months[0].month)
+      : String(months[0].month) + " – " + String(months[months.length - 1].month))
+    : "no sessions yet");
+  set("m-sessions", num(T.sessions, 0));
+
+  /* --- the three streams ---------------------------------------------------
+     One definition per stream, consumed three times: once for the reading
+     trio, once for the trace lane, once for the details table. The order —
+     carbon, electricity, water — is the same everywhere on the page. */
+  var STREAMS = [
+    { id: "carbon", name: "Carbon", cls: "m-carbon", key: "co2_g", tkey: "latest_g",
+      unit: "kg CO2e", laneUnit: "kg CO2e", div: 1000, dp: 2,
+      total: num(emitted, 2), totalUnit: "kg CO2e",
+      eq: EQ.car_miles, eqf: EQ.co2,
+      mark: function () {
+        return glyph([["M3 7c2-2 4 2 6 0s4-2 6 0 4 2 6 0"],
+          ["M3 12c2-2 4 2 6 0s4-2 6 0 4 2 6 0"], ["M3 17c2-2 4 2 6 0s4-2 6 0"]]);
+      } },
+    { id: "energy", name: "Electricity", cls: "m-energy", key: "energy_wh", tkey: "latest_wh",
+      unit: "kWh", laneUnit: "kWh", div: 1000, dp: 2,
+      total: num((Number(T.energy_wh) || 0) / 1000, 2), totalUnit: "kWh",
+      eq: EQ.home_days, eqf: EQ.energy,
+      mark: function () { return glyph([["M13.5 2.5 6 13h4.8l-1.3 8.5L17 11h-4.8z"]]); } },
+    { id: "water", name: "Water", cls: "m-water", key: "water_ml", tkey: "latest_ml",
+      unit: "L", laneUnit: "L", div: 1000, dp: 1,
+      total: num((Number(T.water_ml) || 0) / 1000, 1), totalUnit: "L",
+      eq: EQ.showers, eqf: EQ.water,
+      mark: function () { return glyph([["M12 3c3.7 4.4 6 7.5 6 10a6 6 0 0 1-12 0c0-2.5 2.3-5.6 6-10z"]]); } }
+  ];
+  /* Each metric explains ITS OWN maths, under its own card. A reader asking
+     where 0.287 comes from should find the answer under the electricity
+     reading, not three screens away in a combined derivation block — so the
+     per-metric physics lives here and NOT in the derivation section, which
+     keeps the ledger semantics and the caveats instead. */
+  var CS = DATA.constant_sources || {};
+  function calcRows(id) {
+    if (id === "carbon") {
+      return {
+        lead: "Estimated from deduplicated token counts by per-model factors in gCO2e per million "
+          + "tokens. Nothing here is measured.",
+        formula: F.co2,
+        consts: [["cache read factor", C.cache_read_factor, CS.cache_read_factor]],
+        also: ["Embodied CO2e — the amortised hardware share — is derived from the same energy figure "
+          + "and reported separately, never folded into the operational number:", F.embodied,
+          ["embodied gCO2e/kWh", C.embodied_gco2e_per_kwh, CS.embodied_gco2e_per_kwh]],
+        note: "Sonnet is fitted to three published per-query energies; Opus, Haiku and Fable are "
+          + "extrapolated from it, so Fable carries a double extrapolation."
+      };
+    }
+    if (id === "energy") {
+      return {
+        lead: "Not a second model. The CO2e factors are facility energy multiplied by the grid "
+          + "carbon-intensity factor, so dividing by that same factor recovers facility energy exactly.",
+        formula: F.energy,
+        consts: [["grid carbon intensity g/Wh", C.grid_cif_g_per_wh, CS.grid_cif_g_per_wh]],
+        also: null,
+        note: "That figure is the AWS location-based regional intensity the factors were built on; "
+          + "the US average is higher, so this is the low-side assumption.",
+        /* The question a reader asks when they notice carbon has a price and
+           electricity does not. Answered where they are standing. */
+        why: ["Why there is no cost line for electricity",
+          "Because it would charge twice for one thing. The identity above runs both ways: the kilowatt-hours "
+          + "here are the carbon figure divided by the grid-intensity constant, so the energy and the carbon are "
+          + "the same measurement in two units, not two separate quantities. The cost to clear already prices "
+          + "the emission consequence of every one of these kilowatt-hours, and a second energy charge would be "
+          + "paying twice for one externality. The purchasable instrument would not help either: unbundled "
+          + "renewable-energy certificates retail around $5/MWh, so this whole lifetime would 'settle' for about "
+          + "eleven dollars — and Bjorn et al. 2022 in Nature Climate Change project that on REC-heavy trends "
+          + "42% of committed scope-2 reductions would not correspond to real-world mitigation."]
+      };
+    }
+    return {
+      lead: "Two terms, kept PUE-consistent. On-site cooling water applies to IT energy — facility "
+        + "energy divided by PUE — and off-site generation water applies to the full facility energy.",
+      formula: F.water,
+      consts: [["PUE", C.pue, CS.pue],
+        ["on-site WUE L/kWh", C.wue_onsite_l_per_kwh, CS.wue_onsite_l_per_kwh],
+        ["off-site WUE L/kWh", C.wue_offsite_l_per_kwh, CS.wue_offsite_l_per_kwh]],
+      also: null,
+      note: "L/kWh equals mL/Wh, which is why the stored figure is in millilitres."
+    };
+  }
+  function calcBlock(id) {
+    var r = calcRows(id);
+    /* A native disclosure: per WHATWG HTML the details element "represents a
+       disclosure widget from which the user can obtain additional information
+       or controls", so the keyboard contract, the expanded/collapsed state and
+       the accessible name all come from the platform rather than from ARIA
+       this page would have to maintain. Closed by default — it is the answer
+       to a question, not part of the reading. */
+    var d = h("details", { class: "calc" }, h("summary", {}, "How this is calculated"));
+    var b = h("div", { class: "calc__b" });
+    b.append(h("p", { class: "calc__lead" }, r.lead));
+    /* tabindex on the formula box for the same reason the table wrappers carry
+       it: `overflow-x: auto` makes a region a mouse can scroll and a keyboard
+       cannot, which is SC 2.1.1 Keyboard — a Level A failure, not a nicety. At a
+       320px viewport the widest of these formulae is 605px against 251px of
+       visible width, so without a tab stop well over half of it is unreachable
+       for anyone without a pointer, and for every sighted reader at 400% zoom. */
+    b.append(h("code", { class: "calc__f", tabindex: "0" }, String(r.formula || "")));
+    var dl = h("dl", { class: "calc__c" });
+    r.consts.forEach(function (c) {
+      dl.append(h("dt", {}, c[0] + " = ", h("b", {}, String(c[1]))));
+      dl.append(h("dd", {}, String(c[2] || "No source recorded.")));
+    });
+    b.append(dl);
+    if (r.also) {
+      b.append(h("p", { class: "calc__lead" }, r.also[0]));
+      b.append(h("code", { class: "calc__f", tabindex: "0" }, String(r.also[1] || "")));
+      b.append(h("dl", { class: "calc__c" },
+        h("dt", {}, r.also[2][0] + " = ", h("b", {}, String(r.also[2][1]))),
+        h("dd", {}, String(r.also[2][2] || "No source recorded."))));
+    }
+    b.append(h("p", { class: "calc__note" }, r.note));
+    if (r.why) {
+      b.append(h("p", { class: "calc__why" }, h("b", {}, r.why[0]), r.why[1]));
+    }
+    d.append(b);
+    return d;
+  }
+
+  /* The optional water restoration match. It sits under the water reading, on
+     its own, deliberately far from the carbon dollar pair: this is a
+     CONTRIBUTION and it settles nothing, and the copy says so four different
+     ways because the whole risk of the line is being read as an offset. */
+  function waterMatchBlock() {
+    var w = DATA.water_match || {};
+    var d = h("details", { class: "calc" },
+      h("summary", {}, "Restoration match — a contribution, not a settlement"));
+    var b = h("div", { class: "calc__b" });
+    b.append(h("p", { class: "calc__lead" },
+      "If you want a purchasable gesture toward the water, this is the only audited one that exists. "
+      + "A Water Restoration Certificate returns 1,000 US gallons of flow to a stressed stream, "
+      + "third-party reviewed and registered."));
+    b.append(h("dl", { class: "calc__c" },
+      h("dt", {}, "this account ≈ ", h("b", {}, num(w.gallons, 0) + " US gallons")),
+      h("dd", {}, num(w.liters, 1) + " L converted at 3.785411784 L per US gallon."),
+      h("dt", {}, "≈ ", h("b", {}, num(w.wrc, 2) + " certificates")),
+      h("dd", {}, "1 certificate = 1,000 gallons restored."),
+      h("dt", {}, "≈ ", h("b", {}, usd(w.usd))),
+      h("dd", {}, "at " + usd(w.rate) + " per 1,000 gallons, the issuer's own store price. The same "
+        + "certificate resells for about " + usd(w.rate_low) + " (" + usd(w.usd_low) + " for this account) "
+        + "— a 2× spread in a market with one issuer, which is what a thin market looks like in price "
+        + "form. The first-party price is the one used here; the cheaper quote would understate what the "
+        + "gesture costs at its source.")));
+    b.append(h("p", { class: "calc__why" }, h("b", {}, "What this is not"),
+      "The litres above are an estimate produced by this tool, not a meter reading: about 97% of the "
+      + "figure is a US-average generation-water term applied to modelled energy, so it is a statistical "
+      + "shadow rather than a volume drawn from an identifiable watershed. The certificate is audited, but "
+      + "it is not fungible with that estimate — water is basin-local, and a gallon returned to a stressed "
+      + "stream in one watershed does not repay a gallon drawn in another. Nothing here is verified carbon "
+      + "removal. This line settles nothing: it never touches the carbon balance, it is not an offset of "
+      + "the water this account used, and buying it leaves the figures above exactly where they are."));
+    b.append(h("p", { class: "calc__why" }, h("b", {}, "What is verified"),
+      "That the money reaches an organisation doing measured restoration work — returning flow to a "
+      + "stressed stream, reviewed by a third party and recorded on a registry — rather than an advocacy "
+      + "campaign. That is the whole of the claim."));
+    d.append(b);
+    return d;
+  }
+
+  function glyph(paths) {
+    var g = s("svg", { class: "stream__mark", viewBox: "0 0 24 24", "aria-hidden": "true", focusable: "false" });
+    paths.forEach(function (p) {
+      g.append(s("path", { d: p[0], fill: "none", stroke: "currentColor",
+        "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    });
+    return g;
+  }
+
+  var host = doc.getElementById("stream-cards");
+  STREAMS.forEach(function (m) {
+    var f = m.eqf || {}, t = TR[m.id] || {};
+    var card = h("section", { class: "card stream stream--" + m.id });
+
+    card.append(h("div", { class: "stream__hd" }, m.mark(),
+      h("h3", { class: "stream__n" }, m.name)));
+
+    var trio = h("ul", { class: "trio" });
+
+    /* 1 — the lifetime total. */
+    trio.append(h("li", {},
+      h("p", { class: "badge__k" }, "Lifetime total"),
+      h("p", { class: "badge__v" }, fig(m.total, m.totalUnit))));
+
+    /* 2 — the same total on a familiar scale. The factor, the noun and the
+       citation all come from data/equivalence-constants.json, and the division
+       happened in the generator: no reader and no model is asked to do it. */
+    var eqLi = h("li", {}, h("p", { class: "badge__k" }, "In familiar terms"));
+    if (f.noun) {
+      eqLi.append(h("p", { class: "badge__v" }, fig(num(m.eq, Number(m.eq) >= 10 ? 0 : 2), "")));
+      eqLi.append(h("p", { class: "badge__why" }, f.noun));
+    } else {
+      eqLi.append(h("p", { class: "badge__why" }, "No factor on file."));
+    }
+    if (f.cite) {
+      eqLi.append(h("p", { class: "badge__src" }, f.cite + " · ",
+        f.cite_url ? h("a", { href: f.cite_url }, "source") : null));
+    }
+    trio.append(eqLi);
+
+    /* 3 — the latest month, against the one before it. Direction is carried by
+       an arrow and by the sign, never by colour: a heavier month is not an
+       error and a lighter one is not a success. */
+    var latest = Number(t[m.tkey]) || 0, pct = t.pct;
+    var chip;
+    if (pct === null || pct === undefined) {
+      chip = h("span", { class: "delta" }, TR.prev_month ? "no prior month" : "first month on record");
+    } else {
+      var up = Number(pct) >= 0;
+      chip = h("span", { class: "delta" },
+        h("span", { class: "delta__d", "aria-hidden": "true" }, up ? "▲" : "▼"),
+        (up ? "+" : "−") + num(Math.abs(Number(pct)), 1) + "% vs " + String(TR.prev_month || ""));
+    }
+    trio.append(h("li", {},
+      h("p", { class: "badge__k" }, "Latest month" + (TR.month ? " · " + TR.month : "")),
+      h("p", { class: "badge__v" }, fig(num(latest / m.div, m.dp), m.laneUnit)),
+      chip));
+
+    card.append(trio);
+    card.append(calcBlock(m.id));
+    if (m.id === "water") card.append(waterMatchBlock());
+    host.append(card);
+  });
+
+  /* --- SIGNATURE: usage over time ------------------------------------------
+     Three lanes, one monthly axis. Thin columns rather than lines, because a
+     monthly total is a bin and not a sample. Each lane keeps its own scale —
+     the units are not comparable — and says so in the gutter, so this is three
+     small multiples sharing an axis, never a two-scale chart. */
+  var cTrace = null;
+  (function buildTrace() {
+    var body = doc.getElementById("trace-body");
+    if (!chartRows().length) {
+      body.append(h("p", { class: "empty" }, "No sessions recorded yet, so there is nothing to plot."));
+      return;
+    }
+    var g = s("g", {});
+    var defs = s("defs", {});
+    STREAMS.forEach(function (m) {
+      defs.append(s("linearGradient", { id: "grad-" + m.id, x1: "0", y1: "0", x2: "0", y2: "1" },
+        s("stop", { class: "gs gs--top gs--" + m.id, offset: "0" }),
+        s("stop", { class: "gs gs--bot gs--" + m.id, offset: "1" })));
+    });
+    var svg = s("svg", { class: "chart", id: "c-trace", role: "img",
+      "aria-labelledby": "trace-t", "aria-describedby": "trace-d" },
+      s("title", { id: "trace-t" }, "Carbon, electricity and water over time, on one shared axis"),
+      s("desc", { id: "trace-d" }), defs, g);
+    body.append(h("figure", { class: "fig-wrap" }, svg));
+    cTrace = { svg: svg, g: g, desc: svg.querySelector("desc") };
+  })();
+
+  /* Monotone cubic interpolation, Fritsch-Carlson tangents, emitted as cubic
+     Beziers. The smoothing matters more than it looks: a Catmull-Rom or plain
+     cardinal spline through five monthly points routinely OVERSHOOTS, drawing
+     a maximum higher than any month actually recorded. On a page whose entire
+     claim is that it does not make numbers up, a curve that invents a peak is
+     not a styling choice.
+
+     Fritsch-Carlson limits every tangent to the slopes of the intervals either
+     side of a point, and zeroes it at a local extremum, so the interpolant
+     cannot leave the range spanned by the two points it joins. The curve is
+     therefore smooth AND bounded by the data. The dots drawn on top are the
+     actual monthly totals, so a reader can always see which is measured and
+     which is interpolation. */
+  function monotonePath(pts) {
+    var n = pts.length, i;
+    if (!n) return "";
+    if (n === 1) return "M" + r2(pts[0].x) + "," + r2(pts[0].y);
+    var dx = [], m = [], t = [];
+    for (i = 0; i < n - 1; i++) {
+      dx[i] = pts[i + 1].x - pts[i].x;
+      m[i] = (pts[i + 1].y - pts[i].y) / dx[i];
+    }
+    t[0] = m[0];
+    t[n - 1] = m[n - 2];
+    for (i = 1; i < n - 1; i++) {
+      if (m[i - 1] * m[i] <= 0) {
+        t[i] = 0;                       /* a local extremum: flatten, never overshoot */
+      } else {
+        var w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
+        t[i] = (w1 + w2) / (w1 / m[i - 1] + w2 / m[i]);
+      }
+    }
+    var d = "M" + r2(pts[0].x) + "," + r2(pts[0].y);
+    for (i = 0; i < n - 1; i++) {
+      var h3 = dx[i] / 3;
+      d += "C" + r2(pts[i].x + h3) + "," + r2(pts[i].y + t[i] * h3)
+        + " " + r2(pts[i + 1].x - h3) + "," + r2(pts[i + 1].y - t[i + 1] * h3)
+        + " " + r2(pts[i + 1].x) + "," + r2(pts[i + 1].y);
+    }
+    return d;
+  }
+  function r2(v) { return Math.round(v * 100) / 100; }
+
+  /* AX_H reserves the band under the lanes for the day ruler AND its labels;
+     TICK_* are the three tick heights that make that ruler countable. */
+  var LANE_H = 96, PLOT_H = 60, LANE_TOP = 22, AX_H = 34, RPAD = 10;
+  var TICK_DAY = 4, TICK_WEEK = 7, TICK_MONTH = 11;
+  function drawTrace() {
+    if (!cTrace) return;
+    var W = width(cTrace.svg.parentNode);
+    var H = STREAMS.length * LANE_H + AX_H;
+    cTrace.svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    cTrace.g.textContent = "";
+    /* The gutter carries the lane name and unit. Fixed at 98px it would eat a
+       third of a 320px viewport, so it gives ground before the plot does. */
+    var GUT = Math.round(Math.min(98, Math.max(56, W * 0.22)));
+    var plotW = Math.max(W - GUT - RPAD, 60);
+    var rows = chartRows();
+    var n = rows.length;
+    var detail = monthDetail();
+    var starts = detail ? monthStarts(rows) : [];
+    var desc = [];
+    var xAt = function (i) { return GUT + (n === 1 ? plotW / 2 : (i * plotW) / (n - 1)); };
+    var step = n > 1 ? plotW / (n - 1) : plotW;
+
+    /* The verticals, drawn FIRST so every curve, fill and dot sits over them.
+       Each runs the full height of the stack and down to the label, so one line
+       ties that period's carbon, electricity and water readings to each other
+       and to its date — the shared axis made visible, since the three lanes are
+       the same measurement in three units.
+
+       In the month view there is exactly ONE PER MONTH START, over a trace of
+       days. Everywhere else there is one per bucket, skipped once the buckets
+       pack tighter than 12px, where a line per bucket stops helping and starts
+       hatching the plot. */
+    var vTop = LANE_TOP;
+    var axisTop = STREAMS.length * LANE_H + 3;
+    /* In the month view the rule keeps going past the lanes and becomes the
+       ruler's major tick, so the month boundary is one continuous mark from the
+       top of the stack down into the scale. */
+    var vBot = detail ? axisTop + TICK_MONTH : STREAMS.length * LANE_H + 4;
+    function vline(i, cls) {
+      var vx = r2(xAt(i)) + 0.5;
+      cTrace.g.append(s("line", { class: cls, x1: vx, y1: vTop, x2: vx, y2: vBot }));
+    }
+    if (detail) {
+      if (starts.length === 1 || plotW / Math.max(starts.length - 1, 1) >= 12) {
+        starts.forEach(function (mo) { vline(mo.i, "grid grid--v grid--m"); });
+      }
+    } else if (n && (n === 1 || step >= 12)) {
+      rows.forEach(function (r, i) { vline(i, "grid grid--v"); });
+    }
+
+    /* --- the day ruler -------------------------------------------------------
+       A minor tick per DAY, and between any two month rules there are exactly as
+       many as that month really had. Nothing here knows what a month is: the
+       ticks are drawn from the series rows, and those rows were generated by
+       stepping real dates in SQLite, so February gets 28 — or 29 in a leap year
+       — because February did.
+
+       The 8th, 15th, 22nd and 29th are drawn taller. That is what makes a ruler
+       countable rather than a texture — without it a reader can see that the
+       days are there but cannot find the eleventh. Those marks come from the
+       DATE each row carries, not from counting seven rows along, which matters
+       at both ends of the span: the first month on record usually starts
+       mid-month, and stepping in sevens from whatever day that happened to be
+       would put the tall marks on different dates in the first month than in
+       every month after it.
+
+       It steps down rather than degrading: below 3.5px a day is thinner than
+       the line drawn for it, so only the weekly marks are kept; below 5px those
+       go too and the month rules carry the axis alone. */
+    if (detail) {
+      var perDay = step >= 3.5 ? 1 : (step * 7 >= 5 ? 7 : 0);
+      if (perDay) {
+        for (var di = 0; di < n; di++) {
+          var dom = +String(rows[di].b).slice(8, 10);
+          if (dom === 1) continue;            /* the month rule already is that tick */
+          var weekly = dom % 7 === 1;         /* 8th, 15th, 22nd, 29th */
+          if (perDay > 1 && !weekly) continue;
+          var tx = r2(xAt(di)) + 0.5;
+          cTrace.g.append(s("line", { class: weekly ? "tick tick--w" : "tick",
+            x1: tx, y1: axisTop, x2: tx, y2: axisTop + (weekly ? TICK_WEEK : TICK_DAY) }));
+        }
+      }
+    }
+
+    STREAMS.forEach(function (m, li) {
+      var top = li * LANE_H, plotTop = top + LANE_TOP, baseY = plotTop + PLOT_H;
+      var vals = rows.map(function (r) { return (Number(r[m.key]) || 0) / m.div; });
+      var max = Math.max.apply(null, vals.concat([0])) || 1;
+      /* An all-zero lane has no peak to find: max falls back to 1, which is not
+         in vals, and indexOf hands back -1. Left alone that indexes past the
+         end of the points array and takes the whole chart down, so the empty
+         lane points at its first period instead. */
+      var peak = vals.indexOf(max);
+      if (peak < 0) peak = 0;
+
+      /* A faint field, not a cage: three hairlines, no verticals, no box. */
+      [0, 0.5, 1].forEach(function (f) {
+        cTrace.g.append(s("line", { class: "grid", x1: GUT, y1: r2(baseY - f * PLOT_H) + 0.5,
+          x2: GUT + plotW, y2: r2(baseY - f * PLOT_H) + 0.5 }));
+      });
+
+      cTrace.g.append(s("text", { class: "lane__n", x: "0", y: plotTop + PLOT_H / 2 - 3 }, m.name));
+      cTrace.g.append(s("text", { class: "lane__u", x: "0", y: plotTop + PLOT_H / 2 + 12 }, m.laneUnit));
+
+      var pts = vals.map(function (v, i) {
+        return { x: xAt(i), y: baseY - (v / max) * PLOT_H };
+      });
+      var line = monotonePath(pts);
+      if (line && n > 1) {
+        cTrace.g.append(s("path", { class: "area", d: line
+          + "L" + r2(pts[n - 1].x) + "," + r2(baseY)
+          + "L" + r2(pts[0].x) + "," + r2(baseY) + "Z",
+          fill: "url(#grad-" + m.id + ")" }));
+      }
+      if (line) cTrace.g.append(s("path", { class: "ln ln--" + m.id, d: line }));
+
+      /* The dots are the data; the curve between them is interpolation. Below
+         9px of spacing they fuse into a ribbon and stop distinguishing anything,
+         so at daily resolution only the PEAK keeps its dot — the one point a
+         reader wants to put a date to — and the curve carries the rest. */
+      var showDots = step >= 9;
+      pts.forEach(function (p, i) {
+        if (!showDots && i !== peak) return;
+        var c = s("circle", { class: "dot dot--" + m.id, cx: r2(p.x), cy: r2(p.y), r: "3" });
+        c.append(s("title", {}, rows[i].b + " · " + m.name + " "
+          + num(vals[i], m.dp) + " " + m.laneUnit));
+        cTrace.g.append(c);
+      });
+      if (n) {
+        cTrace.g.append(s("text", { class: "val", x: r2(pts[peak].x),
+          y: r2(pts[peak].y) - 9, "text-anchor": peak === 0 ? "start" : peak === n - 1 ? "end" : "middle" },
+          num(max, m.dp)));
+      }
+      cTrace.g.append(s("line", { class: "base", x1: GUT - 0.5, y1: baseY + 0.5,
+        x2: GUT + plotW, y2: baseY + 0.5 }));
+      desc.push(laneDesc(m, rows, vals, detail, peak, max));
+    });
+
+    /* One time axis under the stack, shared by all three lanes. In the month
+       view the labels clear the ruler; everywhere else they sit where they
+       always did, just under the lanes. */
+    var axY = detail ? axisTop + TICK_MONTH + 11 : STREAMS.length * LANE_H + 16;
+    if (detail) {
+      /* Month labels. Each is anchored just right of the RULE that opens its
+         month, because a boundary mark reads as "August starts here" and not as
+         a value centred over a bin.
+
+         THE YEAR RIDES THE AXIS ONLY WHERE IT CHANGES. Repeating 2026- on every
+         tick spends the width that separates the months on the part that never
+         varies, and choosing one form for the whole axis by its narrowest span
+         drops the year entirely the moment a partial month lands at either end
+         — which is most of the time, since the last month is nearly always
+         still running. Stamping it at the first label and at each January says
+         more in less room and stays correct across a span of several years.
+
+         Where even the bare month cannot fit, months are labelled every kth
+         rather than overlapping. Every rule is still drawn, so the structure
+         survives the thinning even when the words do not. */
+      var spans = starts.map(function (mo, k) {
+        return (k + 1 < starts.length ? xAt(starts[k + 1].i) : GUT + plotW) - xAt(mo.i);
+      });
+      var narrowest = Math.min.apply(null, spans);
+      var everyK = narrowest >= 20 ? 1 : Math.ceil(22 / Math.max(narrowest, 1));
+      starts.forEach(function (mo, k) {
+        if (k % everyK !== 0) return;
+        var newYear = k === 0 || mo.key.slice(0, 4) !== starts[k - 1].key.slice(0, 4);
+        cTrace.g.append(s("text", { class: "ax", x: r2(xAt(mo.i) + 4), y: axY,
+          "text-anchor": "start" }, newYear && spans[k] >= 52 ? mo.key : mo.key.slice(5)));
+      });
+    } else {
+      rows.forEach(function (r, i) {
+        var label = step >= 58 ? fmtBucket(r.b, true) : step >= 26 ? fmtBucket(r.b, false) : "";
+        if (!label && i !== 0 && i !== n - 1) return;
+        if (!label) label = fmtBucket(r.b, false);
+        cTrace.g.append(s("text", { class: "ax", x: r2(xAt(i)), y: axY,
+          "text-anchor": i === 0 ? "start" : i === n - 1 ? "end" : "middle" }, label));
+      });
+    }
+    cTrace.desc.textContent = desc.join(". ") + ".";
+  }
+
+  /* What the chart says out loud. A hundred and fifty daily numbers read in
+     sequence is not a description, it is the table recited badly — so past 40
+     points this summarises and points at the figures table, which carries every
+     row. In the month view the summary is the MONTH totals, because that is the
+     reading the view is organised around, plus the single busiest day. */
+  function laneDesc(m, rows, vals, detail, peak, max) {
+    var head = m.name + " in " + m.laneUnit + ": ";
+    if (rows.length <= 40) {
+      return head + rows.map(function (r, i) { return r.b + " " + num(vals[i], m.dp); }).join(", ");
+    }
+    var parts = [], mt = ((SERIES.month || {}).rows) || [];
+    if (detail) {
+      parts.push("one point per day from " + rows[0].b + " to " + rows[rows.length - 1].b);
+      if (mt.length) {
+        parts.push("month totals " + mt.map(function (r) {
+          return r.b + " " + num((Number(r[m.key]) || 0) / m.div, m.dp); }).join(", "));
+      }
+      parts.push("busiest day " + rows[peak].b + " at " + num(max, m.dp));
+    } else {
+      parts.push(rows.length + " periods from " + rows[0].b + " to " + rows[rows.length - 1].b);
+      parts.push("highest " + rows[peak].b + " at " + num(max, m.dp));
+      parts.push("most recent " + rows[rows.length - 1].b
+        + " at " + num(vals[vals.length - 1], m.dp));
+    }
+    parts.push("every figure is in the table below");
+    return head + parts.join("; ");
+  }
+
+  /* --- the measure ---------------------------------------------------------
+     Settled solid, unsettled OPEN, with a caliper rule where they meet. Filled
+     versus open is the channel that survives a greyscale print, colour-vision
+     deficiency and forced colours; hue is the second channel, not the only
+     one, and both spans are labelled with their figure in the legend. */
+  var TOPLAB_Y = 9, TRACK_Y = 15, TRACK_H = 34, CAL_TOP = 7, CAL_BOT = 55, PCT_Y = 67, MH = 70;
+  doc.getElementById("bal-value").append(fig(num(OS.balance_kg, 2), "kg CO2e outstanding"));
+  set("bal-eq", num(emitted, 2) + " kg emitted − " + num(removal, 2) + " kg verified removal"
+    + (emitted > 0 && unsettled === 0 ? " · fully settled" : ""));
+
+  function drawMeasure() {
+    var g = doc.getElementById("measure-marks"), W = width(measure.parentNode);
+    measure.setAttribute("viewBox", "0 0 " + W + " " + MH);
+    g.textContent = "";
+    if (emitted <= 0) {
+      /* Nothing emitted is not the same state as nothing settled, so it does
+         not get the same mark: a dashed hairline track, never an open one. */
+      g.append(s("rect", { class: "track-none", x: "1", y: TRACK_Y, width: W - 2, height: TRACK_H, rx: "3" }));
+      g.append(s("text", { class: "ax", x: "0", y: PCT_Y }, "Nothing emitted yet — nothing to settle"));
+      set("measure-d", "No emissions recorded, so there is nothing to settle.");
+      return;
+    }
+    var wS = Math.round((settled / emitted) * W), gap = wS > 0 && wS < W ? 3 : 0;
+    g.append(s("text", { class: "ax", x: "0", y: TOPLAB_Y }, "0"));
+    g.append(s("text", { class: "ax", x: W, y: TOPLAB_Y, "text-anchor": "end" },
+      num(emitted, 2) + " kg emitted"));
+    if (wS > 0) {
+      g.append(s("rect", { class: "m-settled", x: "0", y: TRACK_Y,
+        width: Math.max(wS - gap, 1), height: TRACK_H, rx: "3" }));
+    }
+    if (wS < W) {
+      /* Inset by one so the 2px stroke stays inside the viewBox rather than
+         being clipped in half at the right edge. */
+      g.append(s("rect", { class: "m-open", x: wS + 1, y: TRACK_Y + 1,
+        width: Math.max(W - wS - 2, 1), height: TRACK_H - 2, rx: "3" }));
+    }
+    g.append(s("line", { class: "base", x1: "0", y1: TRACK_Y + TRACK_H + 5.5, x2: W, y2: TRACK_Y + TRACK_H + 5.5 }));
+    var pct = (settled / emitted) * 100;
+    if (wS > 0 && wS < W) {
+      var mx = Math.min(Math.max(wS, 1), W - 1);
+      var anchor = pct > 72 ? "end" : pct < 28 ? "start" : "middle";
+      g.append(s("g", { class: "bound" },
+        s("line", { x1: mx, y1: CAL_TOP, x2: mx, y2: CAL_BOT }),
+        s("text", { x: mx, y: PCT_Y, "text-anchor": anchor }, num(pct, 1) + "% settled")));
+    } else {
+      g.append(s("text", { class: "ax", x: "0", y: PCT_Y },
+        wS >= W ? "100% settled" : "0% settled"));
+    }
+    set("measure-d", "Of " + num(emitted, 2) + " kg CO2e emitted, " + num(settled, 2)
+      + " kg is settled by verified removal and " + num(unsettled, 2) + " kg is unsettled."
+      + (removal > emitted ? " Verified removal exceeds emissions by " + num(removal - emitted, 2) + " kg." : ""));
+  }
+
+  /* The legend swatches are the chart's own marks at 12px, drawn as SVG rather
+     than as CSS backgrounds: a chart colour never becomes a background
+     anywhere, which is what keeps "mint is line-work, never a field" testable. */
+  function swatch(kind) {
+    var g = s("svg", { class: "legend__sw", viewBox: "0 0 12 12", "aria-hidden": "true", focusable: "false" });
+    g.append(kind === "settled"
+      ? s("rect", { class: "m-settled", width: "12", height: "12", rx: "2" })
+      : s("rect", { class: "m-open", x: "1", y: "1", width: "10", height: "10", rx: "2" }));
+    return g;
+  }
+  var legend = doc.getElementById("measure-legend");
+  [["settled", "Settled by verified removal", settled], ["open", "Unsettled", unsettled]].forEach(function (l) {
+    legend.append(h("span", { class: "legend__i" }, swatch(l[0]),
+      l[1] + " ", h("span", { class: "legend__v" }, num(l[2], 2) + " kg")));
+  });
+
+  /* --- below the line ------------------------------------------------------ */
+  var memo = doc.getElementById("memo-list");
+  function mark(kind) {
+    var g = s("svg", { class: "memo__mark mk mk--" + kind, viewBox: "0 0 18 18", "aria-hidden": "true" },
+      s("rect", { x: "1", y: "1", width: "16", height: "16" }));
+    if (kind === "prev") g.append(s("line", { x1: "4", y1: "14", x2: "14", y2: "4" }));
+    else { g.append(s("line", { x1: "9", y1: "5", x2: "9", y2: "10" })); g.append(s("line", { x1: "9", y1: "13", x2: "9", y2: "13" })); }
+    return g;
+  }
+  [["prev", "Prevention credits, verified", OS.prevention_verified_kg,
+    "Avoided emissions elsewhere. Real, purchased, and not a removal — so it cannot settle a removal debt."],
+   ["unv", "Unverified purchases", OS.unverified_kg,
+    "No retirement proof on file. Excluded from the balance until verified."]
+  ].forEach(function (r) {
+    memo.append(h("li", { class: "memo__item" }, mark(r[0]),
+      h("div", { class: "memo__label" },
+        r[1] + " · ", h("span", { class: "memo__v" }, num(r[2], 2) + " kg CO2e"),
+        h("span", { class: "memo__why" }, r[3]))));
+  });
+
+  /* --- the dollar ledger: pure dollars, unclamped -------------------------- */
+  var owed = Number(COST.owed_usd) || 0, negative = owed < 0;
+  if (negative) {
+    doc.getElementById("crow-host").append(
+      h("div", { class: "crow" },
+        h("span", { class: "crow__tag" }, "Carbon-negative"),
+        h("p", {}, "Contributions have passed the cost of everything this account has emitted, by "
+          + usd(Math.abs(owed)) + ". The ledger stays unclamped so the surplus keeps showing.")));
+  }
+  var pairs = doc.getElementById("pairs");
+  [["Overall", usd(COST.overall_usd), "Everything emitted, priced at the removal rate.", null],
+   ["Contributed", usd(COST.contributed_usd), "Every dollar given: offset purchases and donations, 1:1.", null],
+   ["Owed", usd(owed), negative
+      ? "In credit. Contributions exceed the overall cost."
+      : "Overall minus contributed. Never clamped at zero.", negative ? "owed--neg" : null]
+  ].forEach(function (p) {
+    pairs.append(h("div", {}, h("dt", {}, p[0]),
+      h("dd", { class: p[3] }, fig(p[1], ""), h("small", {}, p[2]))));
+  });
+  set("rate-note", "Removal rate: " + usd(COST.rate_usd_per_tonne) + " per tonne (data/offset-constants.json). "
+    + "Dollars given never move the tonnes balance above — only verified removal does.");
+
+  /* --- tables --------------------------------------------------------------
+     The wrapper scrolls horizontally on a narrow viewport, so it takes focus: a
+     scrollable region a keyboard user cannot reach is a keyboard trap in
+     reverse (SC 2.1.1 Keyboard; EN 301 549 9.2.1.1). */
+  function table(caption, cols, rows, foot) {
+    return h("div", { class: "tw", tabindex: "0" }, h("table", {}, h("caption", {}, caption),
+      h("thead", {}, make(null, "tr", {}, cols.map(function (c) {
+        return h("th", { scope: "col", class: c[1] ? "n" : null }, c[0]);
+      }))), make(null, "tbody", {}, rows), foot || null));
+  }
+
+  /* --- model families ------------------------------------------------------
+     Horizontal bars, ranked, every bar directly labelled. One nominal series,
+     so every bar takes the same slot: length already carries the magnitude,
+     and colouring by rank would repaint the survivors under any filter. */
+  var cModel = null;
+  (function buildModel() {
+    var body = doc.getElementById("model-body");
+    if (!models.length) return;
+    var g = s("g", {});
+    var svg = s("svg", { class: "chart", id: "c-model", role: "img",
+      "aria-labelledby": "model-t", "aria-describedby": "model-d" },
+      s("title", { id: "model-t" }, "Operational CO2e by model family, in kilograms"),
+      s("desc", { id: "model-d" }), g);
+    body.append(h("figure", { class: "fig-wrap" }, svg));
+    cModel = { svg: svg, g: g, desc: svg.querySelector("desc") };
+  })();
+  function drawModel() {
+    if (!cModel) return;
+    var W = width(cModel.svg.parentNode), rh = 34, gut = 80, right = 86;
+    var span = Math.max(W - gut - right, 40), H = models.length * rh + 4;
+    var vals = models.map(function (m) { return (Number(m.co2_g) || 0) / 1000; });
+    var max = Math.max.apply(null, vals.concat([0])) || 1;
+    cModel.svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    cModel.g.textContent = "";
+    models.forEach(function (m, i) {
+      var y = i * rh + 6, bw = Math.max(Math.round((vals[i] / max) * span), vals[i] > 0 ? 2 : 0);
+      cModel.g.append(s("text", { class: "lane__n", x: "0", y: y + 15, "dominant-baseline": "middle" },
+        String(m.family)));
+      var bar = s("rect", { class: "m-model", x: gut, y: y + 4, width: bw, height: "20", rx: "2" });
+      bar.append(s("title", {}, m.family + ": " + num(vals[i], 2) + " kg CO2e"));
+      cModel.g.append(bar);
+      cModel.g.append(s("text", { class: "val", x: gut + bw + 8, y: y + 15, "dominant-baseline": "middle" },
+        num(vals[i], 2) + " kg"));
+    });
+    cModel.g.append(s("line", { class: "base", x1: gut - 0.5, y1: "4", x2: gut - 0.5, y2: H - 4 }));
+    cModel.desc.textContent = "Kilograms of operational CO2e by model family: " + models.map(function (m, i) {
+      return m.family + " " + num(vals[i], 2); }).join("; ") + ".";
+  }
+
+  /* --- the numbers behind each chart, and the fresh-install empty state ---- */
+  /* The figures under the chart follow the chart, so the two can never disagree
+     about which period is being read. */
+  function traceTable() {
+    var host = doc.getElementById("trace-table");
+    if (!host) return;
+    host.textContent = "";
+    var rows = bucketRows();
+    if (!rows.length) return;
+    var per = granLabel(curG).toLowerCase().replace(/ly$/, "");
+    host.append(h("details", {}, h("summary", {}, "Show the " + granLabel(curG).toLowerCase() + " figures"),
+      table("Operational CO2e, energy, water and session count per " + per + ". "
+        + "A period with no sessions is a zero, not a gap."
+        + (monthDetail() ? " The trace above resolves the same span to single days." : ""),
+        [["Period"], [h("span", { class: "cs" }, "kg CO2e"), 1], ["kWh", 1], ["L", 1], ["Sessions", 1]],
+        rows.map(function (r) {
+          return h("tr", {}, h("th", { scope: "row" }, String(r.b)),
+            h("td", { class: "n" }, num((Number(r.co2_g) || 0) / 1000, 2)),
+            h("td", { class: "n" }, num((Number(r.energy_wh) || 0) / 1000, 2)),
+            h("td", { class: "n" }, num((Number(r.water_ml) || 0) / 1000, 1)),
+            h("td", { class: "n" }, num(r.sessions, 0)));
+        }))));
+  }
+
+  /* The control is a native radio group in a fieldset. Per the APG radio-group
+     pattern, Tab moves focus into and out of the group and lands on the checked
+     button, the arrow keys move and check, and Space checks the focused button
+     — all of which the platform gives for free here, with no ARIA to maintain
+     and no roving tabindex to get wrong. */
+  /* The caption states which bucketing is in force, so a printed copy records
+     what was captured — including, in the month view, that the trace is drawn
+     at a finer resolution than the bucket the reader chose. */
+  /* WHAT A DAY ON THIS PAGE MEANS. Sessions recorded since the ledger started
+     splitting them carry a measured per-day breakdown, taken from the timestamp
+     on each message rather than apportioned. Older ones are filed whole under
+     the day they began, and that is not a rounding error: long sessions are the
+     heavy ones and long sessions are what run past midnight. So the page counts
+     the ones it knows are affected and says so, rather than claiming a day
+     accuracy the older half of the ledger cannot support. */
+  function dayBasisNote() {
+    var b = DATA.day_basis || {};
+    var crossing = Number(b.unsplit_crossing) || 0;
+    if (!crossing) return "";
+    return " " + num(crossing, 0) + " earlier session" + (crossing === 1 ? "" : "s")
+      + " ran past midnight and " + (crossing === 1 ? "is" : "are")
+      + " filed under the day " + (crossing === 1 ? "it" : "they")
+      + " began, because " + (crossing === 1 ? "it predates" : "they predate")
+      + " the per-day split; sessions recorded since carry a measured one.";
+  }
+  function bucketNote() {
+    var d = dayRows().length;
+    return "Bucketed by " + granLabel(curG).toLowerCase().replace(/ly$/, "") + "."
+      + (monthDetail()
+        ? " The trace draws one point per day and rules every month start, so the days"
+          + " inside each month stay visible; the figures below total the months."
+        : "")
+      + (curG === "month" && !monthDetail() && d > DAY_DETAIL_MAX
+        ? " Daily detail inside each month is withheld past " + DAY_DETAIL_MAX
+          + " days on record, where one day is thinner than the line drawn for it."
+        : "")
+      + (curG === "day" || monthDetail() ? dayBasisNote() : "");
+  }
+  (function buildGran() {
+    var host = doc.getElementById("gran-host");
+    if (!host || granOK.length < 2) {
+      if (host && curG) host.append(h("p", { class: "gran__now" }, bucketNote()));
+      return;
+    }
+    var fs = h("fieldset", { class: "gran" }, h("legend", { class: "gran__l" }, "Group by"));
+    granOK.forEach(function (g) {
+      var id = "gran-" + g[0];
+      var input = h("input", { type: "radio", name: "gran", id: id, value: g[0], class: "gran__i" });
+      if (g[0] === curG) input.setAttribute("checked", "");
+      input.addEventListener("change", function () {
+        if (!input.checked) return;
+        curG = g[0];
+        setNow();
+        render();
+        traceTable();
+      });
+      fs.append(input, h("label", { class: "gran__b", for: id }, g[1]));
+    });
+    host.append(fs);
+    var now = h("p", { class: "gran__now" });
+    host.append(now);
+    function setNow() {
+      now.textContent = bucketNote()
+        + (SERIES.year && !SERIES.year.ok
+          ? " Yearly needs at least three years on record."
+          : "")
+        + " Hourly is not offered: a session is recorded split by day and no finer, so an"
+        + " hourly bucket would have nothing to read and would"
+        + " charge a long session entirely to the hour it began.";
+    }
+    setNow();
+  })();
+  (function modelTable() {
+    var body = doc.getElementById("model-body");
+    if (!models.length) { body.append(h("p", { class: "empty" }, "No sessions recorded yet.")); return; }
+    body.append(h("details", {}, h("summary", {}, "Show the model figures"),
+      table("Operational CO2e, energy and session count by model family.",
+        [["Family"], [h("span", { class: "cs" }, "kg CO2e"), 1], ["kWh", 1], ["Sessions", 1]],
+        models.map(function (r) {
+          return h("tr", {}, h("th", { scope: "row" }, String(r.family)),
+            h("td", { class: "n" }, num((Number(r.co2_g) || 0) / 1000, 2)),
+            h("td", { class: "n" }, num((Number(r.energy_wh) || 0) / 1000, 2)),
+            h("td", { class: "n" }, num(r.sessions, 0)));
+        }))));
+  })();
+
+  /* --- the two figures the stream trios deliberately do not carry ---------- */
+  var tiles = doc.getElementById("tiles");
+  [["Embodied CO2e", num((Number(T.embodied_g) || 0) / 1000, 2), "kg, hardware manufacture"],
+   ["API value", usd(T.cost_usd), "list price, not money spent"]
+  ].forEach(function (t) {
+    tiles.append(h("div", {}, h("dt", {}, t[0]),
+      h("dd", {}, fig(t[1], ""), h("small", {}, t[2]))));
+  });
+
+  /* --- audit trail: by payer, then the two registers ---------------------- */
+  function payerRoll() {
+    var by = {}, order = [];
+    function slot(p) {
+      var k = String(p || "—");
+      if (!by[k]) { by[k] = { payer: k, on: 0, okg: 0, ousd: 0, dn: 0, dusd: 0 }; order.push(k); }
+      return by[k];
+    }
+    buys.forEach(function (o) {
+      var r = slot(o.payer);
+      r.on += 1; r.okg += Number(o.kg_co2e) || 0; r.ousd += Number(o.usd) || 0;
+    });
+    gifts.forEach(function (g) { var r = slot(g.payer); r.dn += 1; r.dusd += Number(g.usd) || 0; });
+    return order.sort().map(function (k) { return by[k]; });
+  }
+
+  var payerHost = doc.getElementById("payer-body");
+  var roll = payerRoll();
+  /* The templates ship in a public repository, so no payer name is written in
+     them. The page still names payers — it reads them off the ledger here. */
+  if (roll.length) {
+    var names = roll.map(function (r) { return r.payer; });
+    doc.getElementById("payer-names").textContent = " — "
+      + (names.length === 1 ? names[0]
+        : names.slice(0, -1).join(", ") + " and " + names[names.length - 1]);
+  }
+  if (!roll.length) {
+    payerHost.append(h("p", { class: "empty" },
+      "No purchases or donations on record yet, so there is no tax year to reconcile."));
+  } else {
+    var tk = 0, tu = 0, td = 0;
+    var prows = roll.map(function (r) {
+      tk += r.okg; tu += r.ousd; td += r.dusd;
+      return h("tr", {}, h("th", { scope: "row" }, r.payer),
+        h("td", { class: "n" }, num(r.on, 0)),
+        h("td", { class: "n" }, num(r.okg, 2)),
+        h("td", { class: "n" }, usd(r.ousd)),
+        h("td", { class: "n" }, num(r.dn, 0)),
+        h("td", { class: "n" }, usd(r.dusd)),
+        h("td", { class: "n" }, usd(r.ousd + r.dusd)));
+    });
+    var foot = h("tfoot", {}, h("tr", {}, h("th", { scope: "row" }, "All payers"),
+      h("td", { class: "n" }, num(buys.length, 0)),
+      h("td", { class: "n" }, num(tk, 2)),
+      h("td", { class: "n" }, usd(tu)),
+      h("td", { class: "n" }, num(gifts.length, 0)),
+      h("td", { class: "n" }, usd(td)),
+      h("td", { class: "n" }, usd(tu + td))));
+    payerHost.append(table("Dollars and tonnes attributed to the entity that paid. One CSV per payer per tax year.",
+      [["Payer"], ["Offsets", 1], [h("span", { class: "cs" }, "kg CO2e"), 1], ["Offset spend", 1],
+       ["Donations", 1], ["Donated", 1], ["Total spend", 1]], prows, foot));
+  }
+
+  /* An empty screen is an invitation to act. Both registers get a real empty
+     state naming what will appear and the exact command that files it. */
+  function startPanel(kind, title, what, steps, note) {
+    var p = h("div", { class: "start" },
+      h("p", { class: "start__k" }, kind),
+      h("h4", { class: "start__t" }, title),
+      h("p", { class: "start__d" }, what));
+    /* The picker is the primary path now, so the written-out steps fold away
+       behind a disclosure. They are still here in full for anyone who would
+       rather read the manual, or who is looking at this on paper. */
+    var d = h("details", { class: "calc start__how" },
+      h("summary", {}, "How this works — the full steps"));
+    var ol = h("ol", { class: "start__steps" });
+    steps.forEach(function (st) {
+      ol.append(h("li", {}, h("div", {},
+        h("p", { class: "start__what" }, st[0]),
+        h("code", { class: "cmd", tabindex: "0" }, st[1]))));
+    });
+    d.append(h("div", { class: "calc__b" }, ol, h("p", { class: "start__note" }, note)));
+    p.append(d);
+    return p;
+  }
+
+  /* --- the receipt picker --------------------------------------------------
+     The user wants to hand the page a receipt, not read a manual. This page is
+     a static file: it cannot write the ledger, and no local server is coming
+     back — that was deleted deliberately as an attack surface. So the picker
+     does the honest half of the job entirely on this machine: take the file,
+     hash it, and hand back the exact command that records it.
+
+     Nothing here touches the network. There is no fetch, no XHR, no worker and
+     no beacon anywhere in this page, and a test fails the build if one appears.
+
+     The browser will not tell us where the file lives. Per WHATWG HTML the
+     file input's value IDL attribute "prefixes the filename with the string
+     'C:\fakepath\'" because "some legacy user agents actually included the
+     full path (which was a security vulnerability)". So the command is emitted
+     with a placeholder folder and the page says why. */
+  function hex(buf) {
+    var b = new Uint8Array(buf), out = "", i;
+    for (i = 0; i < b.length; i++) out += (b[i] < 16 ? "0" : "") + b[i].toString(16);
+    return out;
+  }
+  function shellQuote(v) {
+    /* Single-quote for the shell and escape any embedded quote, so a filename
+       containing a space, a quote or a $ cannot change what the command does
+       when it is pasted. */
+    return "'" + String(v).replace(/'/g, "'\\''") + "'";
+  }
+  function buildPicker(host) {
+    var zone = h("div", { class: "pick", id: "pick" });
+    var input = h("input", { type: "file", id: "rcpt", class: "pick__i",
+      accept: ".pdf,.png,.jpg,.jpeg,.webp,.heic,application/pdf,image/*" });
+    zone.append(h("label", { class: "pick__btn", for: "rcpt" }, "Choose a receipt\u2026"), input,
+      h("p", { class: "pick__hint" }, "or drop the file anywhere in this box \u00b7 PDF or image"));
+    var out = h("div", { class: "pick__out", id: "rcpt-out" });
+
+    function render(file, digest) {
+      out.textContent = "";
+      var cmd = "bash scripts/offset-record.sh \\\n"
+        + "  --kg 25 --usd 4.00 \\\n"
+        + "  --vendor remove-carbon-today --pathway biochar \\\n"
+        + "  --category removal --payer \"Your entity\" \\\n"
+        /* The filename is shell-quoted. Receipts routinely arrive called
+           "Puro receipt (Aug'26).pdf" — spaces, brackets and an apostrophe —
+           and pasting that unquoted would break the command at best. The
+           tilde stays OUTSIDE the quotes so the shell still expands it. */
+        + "  --receipt ~/Downloads/" + shellQuote(file.name);
+      out.append(h("p", { class: "pick__k" }, "Selected file"));
+      var meta = h("dl", { class: "pick__meta" },
+        h("dt", {}, "Name"), h("dd", {}, String(file.name)),
+        h("dt", {}, "Size"), h("dd", {}, num(file.size, 0) + " bytes"));
+      meta.append(h("dt", {}, "SHA-256"));
+      meta.append(h("dd", { class: "pick__hash" }, digest === "digest_unavailable"
+        ? "not computed here — offset-record.sh computes and stores it when you run the command"
+        : digest));
+      out.append(meta);
+      out.append(h("p", { class: "pick__k" }, "Run this to record it"));
+      var pre = h("code", { class: "cmd", id: "rcpt-cmd", tabindex: "0" }, cmd);
+      out.append(pre);
+      out.append(h("p", { class: "pick__path" },
+        "The browser does not reveal the folder a file came from, so the path above assumes "
+        + "~/Downloads. Change it if the receipt lives somewhere else."));
+      var btn = h("button", { type: "button", class: "pick__copy" }, "Copy command");
+      var said = h("span", { class: "pick__said", role: "status" });
+      btn.addEventListener("click", function () {
+        function done(msg) { said.textContent = msg; }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(cmd).then(function () { done("Copied."); },
+            function () { selectCmd(); done("Press Cmd-C or Ctrl-C to copy."); });
+        } else {
+          selectCmd();
+          done("Press Cmd-C or Ctrl-C to copy.");
+        }
+      });
+      out.append(h("p", { class: "pick__act" }, btn, said));
+      out.append(h("p", { class: "pick__warn" },
+        "Nothing is recorded until that command runs. This page is a static file and cannot write "
+        + "to the ledger \u2014 recording is what copies the receipt in, stores its bytes and its "
+        + "SHA-256, and makes it appear here against its payer."));
+    }
+    function selectCmd() {
+      var n = doc.getElementById("rcpt-cmd");
+      if (!n || !window.getSelection || !doc.createRange) return;
+      var r = doc.createRange();
+      r.selectNodeContents(n);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      n.focus();
+    }
+    function take(file) {
+      if (!file) return;
+      /* crypto.subtle is only exposed in a secure context, and whether a
+         file:// document counts as one differs by browser — so it is
+         feature-detected, never assumed. Without it the hash is simply not
+         shown: offset-record.sh computes and stores the real one anyway, so
+         nothing is lost but a preview. */
+      var sub = window.crypto && window.crypto.subtle;
+      if (!sub || !window.isSecureContext) { render(file, "digest_unavailable"); return; }
+      file.arrayBuffer().then(function (buf) {
+        return sub.digest("SHA-256", buf);
+      }).then(function (d) {
+        render(file, hex(d));
+      })["catch"](function () { render(file, "digest_unavailable"); });
+    }
+    input.addEventListener("change", function () { take(input.files && input.files[0]); });
+    ["dragenter", "dragover"].forEach(function (e) {
+      zone.addEventListener(e, function (ev) { ev.preventDefault(); zone.classList.add("pick--over"); });
+    });
+    ["dragleave", "drop"].forEach(function (e) {
+      zone.addEventListener(e, function (ev) { ev.preventDefault(); zone.classList.remove("pick--over"); });
+    });
+    zone.addEventListener("drop", function (ev) {
+      var dt = ev.dataTransfer;
+      take(dt && dt.files && dt.files[0]);
+    });
+    host.append(zone, out);
+  }
+
+  var offHost = doc.getElementById("offsets-body");
+  buildPicker(offHost);
+  if (!buys.length) {
+    offHost.append(startPanel("Nothing on file yet", "File your first offset receipt",
+      "Once a purchase is recorded, this section will show the receipt as a download rebuilt from the stored "
+      + "bytes, the SHA-256 of the file as it was at filing time, the registry retirement ID, and a per-payer "
+      + "CSV for the tax year.",
+      [["Ask for it in Claude Code — it walks through the fields and files the receipt for you.",
+        "/carbon-offset"],
+       ["Or record it directly. The receipt is copied into the ledger, never moved or deleted.",
+        "bash scripts/offset-record.sh \\\n  --kg 25 --usd 4.00 \\\n  --vendor remove-carbon-today --pathway biochar \\\n"
+        + "  --category removal --payer \"Your entity\" \\\n  --receipt ~/Downloads/receipt.pdf"],
+       ["Add the registry retirement ID when it is issued, so the purchase counts as verified.",
+        "bash scripts/offset-record.sh --update 1 \\\n  --retirement-id PURO-0000"]],
+      "This page is a static file, so it cannot accept an upload. Recording is what puts a receipt in the "
+      + "ledger: the bytes are stored in the database itself, and the download button here is rebuilt from "
+      + "them, so the record survives with no server and no link to rot."));
+  } else {
+    var rows = buys.map(function (o) {
+      var ok = Number(o.verified) === 1, path = String(o.receipt_path || "");
+      var badge = h("span", { class: "badge " + (ok ? "badge--ok" : "badge--no") },
+        h("span", { "aria-hidden": "true" }, ok ? "✓ " : "⚠ "), ok ? "Verified" : "Unverified");
+      var b64 = String(o.receipt_b64 || "");
+      var fname = String(o.receipt_filename || "") || path.split("/").pop() || "receipt";
+      var pref = /\.pdf$/i.test(fname)
+        ? "data:application/pdf;base64,"
+        : "data:application/octet-stream;base64,";
+      var receipt = b64
+        ? h("a", { class: "dl", href: pref + b64, download: fname },
+            h("span", { "aria-hidden": "true" }, "\u2193 "), "Download")
+        : path
+          ? h("a", { class: "dl", href: "file://" + path }, path.split("/").pop())
+          : "—";
+      var sha = String(o.receipt_sha256 || "");
+      return h("tr", {},
+        h("th", { scope: "row" }, String(o.purchase_date || "—")),
+        h("td", {}, String(o.payer || "—")),
+        h("td", {}, String(o.vendor || "—"),
+          h("span", { class: "td__note" }, String(o.pathway || ""))),
+        h("td", { class: "n" }, num(o.kg_co2e, 2)),
+        h("td", { class: "n" }, usd(o.usd)),
+        /* Category and status share a cell: at ten columns the receipt column
+           was pushed off the sheet, and these two always read together. */
+        h("td", {}, badge,
+          h("span", { class: "td__note" }, String(o.category || "—")
+            + (String(o.category) === "removal" ? "" : " · does not settle"))),
+        h("td", {}, String(o.retirement_id || "—")),
+        h("td", { class: "hash" }, sha || "—"),
+        h("td", {}, receipt));
+    });
+    /* The receipts are the reason a user opens this section, so their count is
+       stated before the register rather than left to be inferred from it. */
+    var withBlob = buys.filter(function (o) { return String(o.receipt_b64 || ""); }).length;
+    var withId = buys.filter(function (o) { return String(o.retirement_id || ""); }).length;
+    /* Stated as counts rather than a sentence, so the copy never has to agree
+       with a number it does not know ("1 carry a retirement ID"). */
+    doc.getElementById("receipt-roll").append(h("p", { class: "roll" },
+      "Receipts on file: ", h("b", {}, withBlob + " of " + buys.length),
+      ". Registry retirement IDs: ", h("b", {}, withId + " of " + buys.length),
+      ". Every download below is rebuilt from bytes stored in the ledger itself, "
+      + "so the record works with no server and no link to rot."));
+    offHost.append(table(buys.length + " purchase" + (buys.length === 1 ? "" : "s")
+      + " · " + usd(OS.offset_spent_usd) + " spent · newest first. "
+      + "The hash is the SHA-256 of the receipt file as recorded; the download is rebuilt from the stored bytes.",
+      [["Date"], ["Payer"], ["Vendor"], [h("span", { class: "cs" }, "kg CO2e"), 1], ["USD", 1],
+       ["Status"], ["Retirement ID"], ["Receipt hash"], ["Receipt"]], rows));
+  }
+
+  var giftHost = doc.getElementById("donations-body");
+  if (!gifts.length) {
+    giftHost.append(startPanel("Nothing on file yet", "Record a donation",
+      "Donations are logged in dollars against the payer that gave them. They reduce the dollar ledger above "
+      + "and never the tonnes balance, because a gift does not buy a verified removal.",
+      [["Record one with the organisation and the entity that paid.",
+        "bash scripts/donation-record.sh \\\n  --usd 25.00 --org \"American Rivers\" \\\n  --payer \"Your entity\""],
+       ["Attach the acknowledgement letter if you have one, and its SHA-256 is recorded alongside.",
+        "bash scripts/donation-record.sh \\\n  --usd 25.00 --org \"American Rivers\" \\\n"
+        + "  --payer \"Your entity\" \\\n  --receipt ~/Downloads/thank-you.pdf"]],
+      "The seven destinations below are the shortlist this ledger was built against."));
+  } else {
+    var grows = gifts.map(function (g) {
+      var sha = String(g.receipt_sha256 || "");
+      return h("tr", {},
+        h("th", { scope: "row" }, String(g.donation_date || "—")),
+        h("td", {}, String(g.payer || "—")),
+        h("td", {}, String(g.org || "—")),
+        h("td", { class: "n" }, usd(g.usd)),
+        h("td", { class: "hash" }, sha || "—"));
+    });
+    giftHost.append(table(gifts.length + " donation" + (gifts.length === 1 ? "" : "s")
+      + " · newest first. Donations reduce the dollar ledger, never the tonnes balance.",
+      [["Date"], ["Payer"], ["Organisation"], ["USD", 1], ["Receipt SHA-256"]], grows));
+  }
+
+  /* --- the giving briefing -------------------------------------------------
+     Rendered entirely from DATA.giving. Not one sentence about any
+     organisation is written in this template: the copy, the price signal, the
+     honest verdict and the research behind them all live in
+     data/giving-shortlist.json, which records the document each claim came
+     from. Links are set through setAttribute, never parsed as markup. */
+  var giveHost = doc.getElementById("give-body");
+  (GIVE.tiers || []).forEach(function (tier) {
+    var orgs = (GIVE.orgs || []).filter(function (o) { return o.tier === tier.id; });
+    if (!orgs.length) return;
+    var sec = h("section", { class: "tier" },
+      h("div", { class: "tier__hd" },
+        h("h3", { class: "tier__t" }, String(tier.label || "")),
+        h("p", { class: "tier__d" }, String(tier.blurb || ""))));
+    var list = h("ul", { class: "orgs" + (orgs.length > 1 ? " orgs--multi" : "") });
+    orgs.forEach(function (o) {
+      var card = h("li", { class: "card org" });
+      /* The photograph leads the card. It arrives either as GEOMETRY (viewBox
+         plus path d strings) or as a RASTER whose src is already an inline
+         data: URI — never as markup, so an illustration goes through
+         createElementNS and setAttribute like every other value here and can
+         never be an injection vector. The generator refuses to build unless
+         provenance is complete, so an image that renders is one whose licence
+         is printed in the colophon. */
+      var img = o.image;
+      if (img && (img.paths || []).length) {
+        var art = s("svg", { viewBox: String(img.viewBox), role: "img",
+          "aria-label": String(img.alt || ""), preserveAspectRatio: "xMidYMid slice" });
+        img.paths.forEach(function (d) {
+          art.append(s("path", { d: String(d), fill: "currentColor",
+            "fill-rule": img.fill_rule ? String(img.fill_rule) : null }));
+        });
+        card.append(h("figure", { class: "org__banner" }, art));
+      } else if (img && String(img.src || "").indexOf("data:") === 0) {
+        card.append(h("figure", { class: "org__banner" },
+          h("img", { src: String(img.src), alt: String(img.alt || ""),
+            width: "800", height: "300", decoding: "sync" })));
+      } else {
+        /* No public-domain federal photograph of this subject exists. Reserving
+           photo-sized space for one produced a huge empty plate with a label
+           adrift in it — worse than no picture. These cards take a mint top
+           rule instead, so they still open with an edge, and nothing is held
+           open for an image that is never coming. The colophon already records
+           why they carry none.
+
+           They are never seen beside a photographed card in any case: the two
+           are the only members of their own tiers, which is the research's own
+           ranking, not a layout accident. */
+        card.setAttribute("class", "card org org--plain");
+      }
+      var body = h("div", { class: "org__b" });
+      body.append(h("span", { class: "org__area" }, String(o.area || "")));
+      /* A CLIPPED separator, not a visible one and not CSS. The name and its
+         qualifier are two elements inside one heading, and with nothing between
+         them the computed accessible name runs together as
+         "Remove Carbon Todaybiochar CORCs" — the <small> is display:block, so it
+         looks right and reads wrong. A visible separator would leave a dangling
+         middot at the end of the name line, and a ::before would not enter the
+         name computation at all. */
+      body.append(h("h4", { class: "org__n" },
+        h("a", { href: String(o.url || "") }, String(o.name || "")),
+        o.sub ? h("span", { class: "vh" }, " · ") : null,
+        o.sub ? h("small", {}, String(o.sub)) : null));
+      if (o.price) body.append(h("p", {}, h("span", { class: "org__price" }, String(o.price))));
+      card.append(body);
+      /* Everything after this point fills the padded body, not the card. */
+      var li = body;
+      li.append(h("p", { class: "org__does" }, String(o.does || "")));
+      if (o.price_note) li.append(h("p", { class: "org__pn" }, String(o.price_note)));
+      if (o.verdict) {
+        li.append(h("p", { class: "org__verdict" },
+          h("b", {}, "Carbon verdict"), String(o.verdict)));
+      }
+      if (o.update) {
+        li.append(h("p", { class: "org__update" },
+          h("b", {}, "Supporting research"), String(o.update)));
+      }
+      var links = h("ul", { class: "org__links" });
+      (o.evidence || []).forEach(function (e, i) {
+        links.append(h("li", {}, i === 0 ? h("b", {}, "Evidence ") : null,
+          h("a", { href: String(e.url || "") }, String(e.label || ""))));
+      });
+      if (o.news && o.news.url) {
+        links.append(h("li", {}, h("b", {}, "News "),
+          h("a", { href: String(o.news.url) }, String(o.news.label || "News")),
+          o.news.note ? " (" + String(o.news.note) + ")" : null));
+      }
+      li.append(links);
+      list.append(card);
+    });
+    sec.append(list);
+    giveHost.append(sec);
+  });
+
+  /* --- derivation: static prose, live constants ---------------------------- */
+  /* The per-metric physics lives under each metric hero now. What stays here
+     is what is NOT per-metric: how the balance is defined, how the dollar
+     ledger works, and what the whole thing is worth as evidence. */
+  var meth = doc.getElementById("meth");
+  [["Carbon balance",
+    "Emitted minus VERIFIED REMOVAL ONLY. Prevention credits stop a future emission and unverified purchases have no "
+    + "retirement proof on file; both are recorded below the line and neither settles a removal debt. This is the "
+    + "GHG Protocol / SBTi distinction, not a house rule.", F.balance],
+   ["Dollar ledger",
+    "A separate account in plain dollars, deliberately unclamped. Overall prices everything emitted at the removal "
+    + "rate; contributed counts every dollar given, offsets and donations alike, with no conversion into tonnes. Once "
+    + "contributions pass the overall cost, owed goes negative and the page reports it as carbon-negative.", F.owed],
+   ["API value",
+    "The list price the same work would have cost on pay-as-you-go, not money actually spent on a subscription. It is "
+    + "context for scale and it never enters the carbon or dollar ledgers.", null],
+   ["Uncertainty",
+    "Anthropic publishes no per-query energy data. Every figure here — carbon, energy, water, embodied — is an "
+    + "order-of-magnitude estimate with roughly ±50% uncertainty, and the excluded items (training, most of the "
+    + "supply chain) make the true value more likely above the displayed one than below it.", null]
+  ].forEach(function (m) {
+    meth.append(h("div", {},
+      h("dt", { class: "meth__t" }, m[0]),
+      h("dd", { class: "meth__d" }, m[1], m[2] ? h("span", { class: "meth__f", tabindex: "0" }, m[2]) : null)));
+  });
+
+  /* --- colophon: where an illustration's licence can actually be checked ----
+     Only rendered when something is illustrated. The generator has already
+     refused to build if any of these fields were missing, so every entry here
+     is complete by construction. */
+  var creds = DATA.image_credits || [];
+  if (creds.length) {
+    var box = h("div", { class: "credits" },
+      h("h3", { class: "credits__h" }, "Illustration credits"));
+    var cl = h("ul", { class: "credits__list" });
+    creds.forEach(function (c) {
+      cl.append(h("li", {},
+        h("b", {}, String(c.org || "")), " — ",
+        h("a", { href: String(c.source_url || "") }, String(c.title || "")),
+        ". " + String(c.agency || "") + (c.author ? ", " + String(c.author) : "") + ". ",
+        h("a", { href: String(c.license_url || "") }, String(c.license || ""))));
+    });
+    box.append(cl);
+    box.append(h("p", { class: "note", style: "margin-top:0.9rem" },
+      "Every photograph here is a work of the U.S. federal government and therefore in the public "
+      + "domain; each licence was checked on that file's own record rather than assumed from the "
+      + "agency, because .gov sites also host contractor and partner photographs that are not. All "
+      + "are toned to one treatment so the set reads together, stripped of camera metadata, and "
+      + "embedded in this file, so the page still draws them with the network off."));
+    box.append(h("p", { class: "note", style: "margin-top:0.6rem" },
+      "Two are subject-adjacent rather than literal. No public-domain photograph exists of a "
+      + "biochar certificate operation, or of Tradewater's own work, so those cards show a charcoal "
+      + "kiln — the vessel biochar is made in — and legacy well plugging and abandonment, which is "
+      + "half of what Tradewater does. Each alt text names what its photograph actually shows and "
+      + "where, and claims nothing beyond it."));
+    doc.getElementById("credits").append(box);
+  }
+
+  /* --- the print guard ------------------------------------------------------
+     Every disclosure on this page is closed by default, and a closed disclosure
+     PRINTS closed — which would quietly gut the archived document, since this
+     page exists to be filed. Per WHATWG HTML the open attribute is what decides:
+     "If the attribute is absent, only the summary is to be shown ... if the
+     attribute is added, the information should be shown." CSS cannot do this,
+     so the attribute is set before printing and restored afterwards, leaving the
+     screen exactly as the reader left it.
+
+     Two triggers, because not every engine fires the events: the beforeprint and
+     afterprint events, and a media-query listener on print as a fallback. */
+  var wasOpen = null;
+  function openAll() {
+    var all = doc.querySelectorAll("details");
+    wasOpen = [];
+    Array.prototype.forEach.call(all, function (d, i) {
+      wasOpen[i] = d.hasAttribute("open");
+      d.setAttribute("open", "");
+    });
+  }
+  function restoreAll() {
+    if (!wasOpen) return;
+    var all = doc.querySelectorAll("details");
+    Array.prototype.forEach.call(all, function (d, i) {
+      if (!wasOpen[i]) d.removeAttribute("open");
+    });
+    wasOpen = null;
+  }
+  addEventListener("beforeprint", openAll);
+  addEventListener("afterprint", restoreAll);
+  if (window.matchMedia) {
+    var mq = window.matchMedia("print");
+    var onMq = function (e) { if (e.matches) openAll(); else restoreAll(); };
+    if (mq.addEventListener) mq.addEventListener("change", onMq);
+    else if (mq.addListener) mq.addListener(onMq);
+  }
+
+  /* --- draw, and redraw at the measured width on resize -------------------- */
+  var pending = 0;
+  function render() { drawMeasure(); drawTrace(); drawModel(); }
+  traceTable();
+  render();
+  addEventListener("resize", function () {
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(render);
+  });
+})();
+</script>
+</body>
+</html>

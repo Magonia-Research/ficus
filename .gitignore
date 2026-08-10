@@ -1,0 +1,12 @@
+*.db
+*.db-journal
+exports/
+docs/private/
+promo/
+.DS_Store
+.playwright-mcp/
+canva-*.png
+.claude/settings.local.json
+
+# Agent scratch: originals and intermediates for the giving-section artwork.
+.claude-tmp/

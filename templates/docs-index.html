@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Ficus — the carbon, electricity and water behind your Claude Code usage</title>
+<meta name="description" content="Ficus estimates the energy, water and CO2e of Claude Code sessions, prices the carbon at a verified-removal rate, and shows the working. Install guide, data sources, formulas and giving research.">
+<style>
+/* ==========================================================================
+   Ficus documentation index.
+   Same design system as the dashboard it links to — white sheets on a
+   near-white plane, mint as the ruling rather than a fill, a mono/sans split
+   between machine figures and human prose, and NO dark variant. Kept in one
+   inline stylesheet because this page carries the project's own offline
+   invariant: nothing here may be LOADED from the network.
+   ========================================================================== */
+:root {
+  color-scheme: light;
+  --plane:     #f7f9f8;
+  --surface:   #ffffff;
+  --mint:      #0f9563;
+  --mint-soft: #9cd8c2;
+  --grey-950:  #101614;
+  --grey-800:  #2c3733;
+  --grey-700:  #414e49;
+  --grey-600:  #5c6b65;
+  --ink-1:     var(--grey-950);
+  --ink-head:  var(--grey-800);
+  --ink-2:     var(--grey-700);
+  --ink-3:     var(--grey-600);
+  --rule:      var(--mint-soft);
+  --rule-key:  var(--mint);
+  --accent:    #0b6b3f;
+  --critical:  #a3271f;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+  --shadow: 0 1px 2px rgb(16 22 20 / 5%);
+  --r-lg: 12px;
+  --r-md: 8px;
+  --r-sm: 4px;
+}
+:root { color-scheme: light; }
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--plane);
+  color: var(--ink-1);
+  font: 400 1rem/1.7 var(--sans);
+  -webkit-text-size-adjust: 100%;
+}
+:focus-visible { outline: 3px solid var(--ink-1); outline-offset: 2px; border-radius: 2px; }
+.skip {
+  position: absolute; left: -9999px; top: 0; z-index: 10;
+  padding: 0.6rem 1rem; background: var(--surface); color: var(--ink-1);
+  border: 2px solid var(--rule-key); border-radius: var(--r-sm);
+}
+.skip:focus { left: 1rem; top: 1rem; }
+/* The sticky masthead would otherwise park itself over whatever just took
+   focus — WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum), failure technique
+   F110. scroll-padding-top insets the scrollport so that the strip behind the
+   bar no longer counts as visible and focus moving into it forces a scroll;
+   scroll-margin-top then reserves the same height at each target, including
+   every tab stop, since a link inherits no scroll-margin from its section. */
+html { scroll-padding-top: 4.5rem; }
+main, section, .panel, .org,
+a[href], button, summary, input, label, [tabindex] { scroll-margin-top: 4.5rem; }
+.wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem 5rem; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:hover { color: var(--ink-1); }
+code, kbd, samp, pre { font-family: var(--mono); font-size: 0.875em; }
+code { background: #eef2f0; padding: 0.1em 0.35em; border-radius: var(--r-sm); }
+pre {
+  margin: 0.9rem 0; padding: 0.95rem 1.1rem; overflow-x: auto;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-key); border-radius: var(--r-md);
+  font-size: 0.8125rem; line-height: 1.7;
+}
+pre code { background: none; padding: 0; }
+
+/* --- masthead ------------------------------------------------------------ */
+.bar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--surface); border-bottom: 2px solid var(--rule-key);
+  box-shadow: var(--shadow);
+}
+.bar__in {
+  max-width: 62rem; margin: 0 auto; padding: 0.7rem 1.25rem;
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; align-items: baseline;
+}
+.mark { display: flex; align-items: center; gap: 0.55rem; }
+.mark svg { display: block; }
+.mark b { font: 700 1.0625rem/1.2 var(--sans); letter-spacing: -0.01em; }
+.mark span {
+  font: 600 0.5625rem/1.2 var(--mono); letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.bar nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 0.9rem; }
+.bar nav a {
+  font: 600 0.6875rem/1.4 var(--mono); letter-spacing: 0.08em;
+  text-transform: uppercase; text-decoration: none; color: var(--ink-2);
+}
+.bar nav a:hover { color: var(--accent); text-decoration: underline; }
+
+/* --- hero ---------------------------------------------------------------- */
+.hero { padding: 3rem 0 1.5rem; }
+.hero h1 { margin: 0 0 0.9rem; font-size: clamp(1.9rem, 5vw, 2.9rem); line-height: 1.12; letter-spacing: -0.02em; }
+.hero p.lede { margin: 0 0 1.4rem; font-size: 1.125rem; color: var(--ink-2); max-width: 46rem; }
+.cta { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: center; margin: 1.6rem 0 0; }
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.7rem 1.15rem; border-radius: var(--r-md);
+  font: 600 0.9375rem/1.2 var(--sans); text-decoration: none;
+}
+.btn--go { background: var(--accent); color: #fff; border: 2px solid var(--accent); }
+.btn--go:hover { background: var(--ink-1); border-color: var(--ink-1); color: #fff; }
+.btn--alt { background: var(--surface); color: var(--ink-1); border: 2px solid var(--rule-key); }
+.btn--alt:hover { border-color: var(--ink-1); color: var(--ink-1); }
+.cta small { color: var(--ink-3); font-size: 0.8125rem; }
+
+/* --- the estimate banner: this page never lets the caveat out of sight --- */
+.estimate {
+  display: flex; gap: 0.85rem; align-items: flex-start;
+  margin: 1.8rem 0 0; padding: 0.85rem 1rem;
+  background: var(--surface); border: 1px solid var(--critical);
+  border-left: 4px solid var(--critical); border-radius: var(--r-md);
+  font-size: 0.9375rem; color: var(--ink-2);
+}
+.estimate b {
+  flex: none; font: 700 0.625rem/1.7 var(--mono); letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--critical);
+  border: 1px solid var(--critical); border-radius: var(--r-sm); padding: 0 0.4rem;
+}
+
+/* --- sections ------------------------------------------------------------ */
+section { padding-top: 3.2rem; }
+.eyebrow {
+  display: block; margin-bottom: 0.35rem;
+  font: 700 0.5625rem/1.6 var(--mono); letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-head);
+}
+h2 { margin: 0 0 0.5rem; font-size: 1.6rem; line-height: 1.2; letter-spacing: -0.015em; }
+h3 { margin: 1.8rem 0 0.4rem; font-size: 1.0625rem; line-height: 1.3; }
+h4 { margin: 1.2rem 0 0.3rem; font-size: 0.9375rem; }
+.sub { margin: 0 0 1.2rem; color: var(--ink-2); max-width: 48rem; }
+.hr { height: 2px; background: var(--rule-key); margin: 0.9rem 0 1.5rem; }
+.panel {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: var(--r-lg); box-shadow: var(--shadow);
+  padding: 1.35rem 1.5rem; margin: 1rem 0;
+}
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+.note { font-size: 0.875rem; color: var(--ink-2); }
+ol.steps { margin: 0; padding-left: 1.3rem; }
+ol.steps > li { margin-bottom: 1.4rem; }
+ol.steps > li::marker { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+ul.tight { margin: 0.5rem 0; padding-left: 1.2rem; }
+ul.tight li { margin-bottom: 0.35rem; }
+
+/* --- tables -------------------------------------------------------------- */
+.tw { overflow-x: auto; margin: 1rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+caption { text-align: left; padding-bottom: 0.6rem; color: var(--ink-2); font-size: 0.8125rem; }
+th, td { padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--rule); vertical-align: top; text-align: left; }
+thead th {
+  border-bottom: 2px solid var(--rule-key); color: var(--ink-head); white-space: nowrap;
+  font: 700 0.625rem/1.6 var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+}
+tbody th { font-weight: 600; }
+td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.src { color: var(--ink-3); font-size: 0.8125rem; }
+
+/* --- formula ------------------------------------------------------------- */
+.formula {
+  margin: 0.6rem 0; padding: 0.75rem 0.95rem;
+  background: #f7faf9; border: 1px dashed var(--rule);
+  border-radius: var(--r-md);
+  font: 500 0.8125rem/1.75 var(--mono); color: var(--ink-1);
+  overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+}
+
+/* --- giving -------------------------------------------------------------- */
+.tier { margin-top: 2.1rem; }
+.tier__h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; }
+.tier__h h3 { margin: 0; }
+.tier__b { margin: 0.35rem 0 0; color: var(--ink-2); font-size: 0.9375rem; max-width: 48rem; }
+.org { margin-top: 1rem; }
+.org__h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 0.8rem; }
+.org__h h4 { margin: 0; font-size: 1.0625rem; }
+.org__area {
+  font: 600 0.5625rem/1.7 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.chip {
+  display: inline-block; padding: 0.12rem 0.5rem; border-radius: 999px;
+  border: 1px solid var(--rule-key); color: var(--accent);
+  font: 600 0.75rem/1.6 var(--mono); white-space: nowrap;
+}
+.org p { margin: 0.5rem 0; }
+.org .verdict { border-left: 3px solid var(--rule-key); padding-left: 0.8rem; color: var(--ink-1); }
+.org .update { font-size: 0.875rem; color: var(--ink-2); }
+.org__links { margin: 0.6rem 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.8125rem; }
+
+/* --- shot ---------------------------------------------------------------- */
+figure.shot { margin: 1.2rem 0 0; }
+figure.shot img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--rule); border-radius: var(--r-md);
+}
+figure.shot figcaption { margin-top: 0.5rem; font-size: 0.8125rem; color: var(--ink-3); }
+
+footer.wrap { padding-top: 1.4rem; border-top: 2px solid var(--rule-key); font-size: 0.875rem; color: var(--ink-2); }
+footer p { margin: 0.4rem 0; max-width: 62rem; }
+
+@media print {
+  .bar, .skip { position: static; }
+  .panel, pre { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <div class="bar__in">
+    <span class="mark">
+      <!-- The same potted ficus the dashboard carries. See the note there: it is
+           drawn for 24px, and the pot is the only dark mass so the silhouette
+           holds in greyscale. -->
+      <svg width="22" height="22" viewBox="0 0 24 24" role="img" aria-label="Ficus">
+        <path d="M11.6,14.4Q5.32,16.26 2.4,10.4Q8.68,8.54 11.6,14.4Z" fill="var(--mint-soft)"/>
+        <path d="M12 18.2c0-3.7.1-6.6.3-9.2" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+        <g fill="var(--rule-key)">
+          <path d="M12.4,13.4Q15.32,7.54 21.6,9.4Q18.68,15.26 12.4,13.4Z"/>
+          <path d="M11.6,11.6Q4.83,12.17 3.1,5.6Q9.87,5.03 11.6,11.6Z"/>
+          <path d="M12.4,10.2Q14.13,3.63 20.9,4.2Q19.17,10.77 12.4,10.2Z"/>
+          <path d="M12,9.2Q8.78,5.7 12,2.2Q15.22,5.7 12,9.2Z"/>
+        </g>
+        <path d="M7.5 18.4h9l-.85 3.1a1.2 1.2 0 0 1-1.16.88h-4.98a1.2 1.2 0 0 1-1.16-.88z" fill="var(--ink-head)"/>
+        <rect x="6.5" y="17" width="11" height="2.1" rx="1.05" fill="var(--ink-2)"/>
+      </svg>
+      <b>Ficus</b>
+      <span>Carbon station · Claude Code</span>
+    </span>
+    <nav aria-label="Sections">
+      <a href="#install">Install</a>
+      <a href="#sources">Sources</a>
+      <a href="#maths">Maths</a>
+      <a href="#giving">Giving</a>
+      <a href="dashboard.html">Example</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" id="main" tabindex="-1">
+
+  <div class="hero">
+    <h1>What your Claude Code habit costs the atmosphere</h1>
+    <p class="lede">Ficus reads the token counts Claude Code already writes to disk, turns them into
+      electricity, water and CO2e using published factors, and prices the carbon at what verified
+      removal actually sells for. It runs entirely on your machine, and it shows every constant and
+      every formula it used.</p>
+
+    <div class="cta">
+      <a class="btn btn--go" href="dashboard.html">View the example dashboard →</a>
+      <a class="btn btn--alt" href="https://github.com/Magonia-Research/ficus">Source on GitHub</a>
+      <small>The example is fabricated data, rendered by the real code.</small>
+    </div>
+
+    <p class="estimate"><b>Estimate</b> <span>No vendor publishes per-query energy for a hosted
+      model. Every figure here is an order-of-magnitude estimate — treat it as <strong>±50%</strong>.
+      Trends over time are meaningful; the absolute numbers are indicative.</span></p>
+  </div>
+
+  <!-- ============================ INSTALL ============================ -->
+  <section id="install">
+    <span class="eyebrow">Getting started</span>
+    <h2>Install</h2>
+    <p class="sub">Four steps. Nothing is installed system-wide, nothing phones home, and every file
+      it writes lives under your Claude config directory.</p>
+    <div class="hr"></div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Before you start</h3>
+      <ul class="tight">
+        <li><code>bash</code>, <code>sqlite3</code> (3.41+ for receipt downloads) and <code>jq</code> — all present on a current macOS or Linux box.</li>
+        <li>Claude Code, with a config directory at <code>~/.claude</code> (or <code>$CLAUDE_CONFIG_DIR</code>).</li>
+        <li>No package manager, no runtime, no daemon. It is shell scripts and one SQLite file.</li>
+      </ul>
+    </div>
+
+    <ol class="steps">
+      <li>
+        <h4>Clone it</h4>
+<pre tabindex="0"><code>git clone https://github.com/Magonia-Research/ficus.git
+cd ficus</code></pre>
+      </li>
+      <li>
+        <h4>Create the ledger</h4>
+        <p class="note"><code>setup.sh</code> creates the SQLite database and writes
+          <code>factors.env</code>, the small constants file the statusline reads.</p>
+<pre tabindex="0"><code>bash scripts/setup.sh</code></pre>
+      </li>
+      <li>
+        <h4>Backfill your history</h4>
+        <p class="note">Claude Code keeps session transcripts on disk. This reads them, deduplicates
+          the token counts and records one row per session — so the ledger starts with everything you
+          have already done rather than from zero.</p>
+<pre tabindex="0"><code>bash scripts/backfill.sh</code></pre>
+      </li>
+      <li>
+        <h4>Wire the hooks and the statusline</h4>
+        <p class="note">A <code>Stop</code> hook records each session as it ends; a
+          <code>SessionStart</code> hook re-runs the safety scan. Add to
+          <code>~/.claude/settings.json</code>:</p>
+<pre tabindex="0"><code>{
+  "hooks": {
+    "Stop": [{ "hooks": [{ "type": "command",
+      "command": "bash /path/to/ficus/scripts/persist-session.sh" }] }],
+    "SessionStart": [{ "hooks": [{ "type": "command",
+      "command": "bash /path/to/ficus/scripts/safety-rescan.sh" }] }]
+  }
+}</code></pre>
+        <p class="note">For the live readings in your statusline, either use
+          <code>statusline-snippet.sh</code> as-is or fold it into an existing statusline —
+          <a href="https://github.com/Magonia-Research/ficus/blob/main/docs/statusline-segment.md">docs/statusline-segment.md</a>
+          has the merge recipe. The render path reads two pre-written files and runs one
+          <code>awk</code>; it never touches the database.</p>
+      </li>
+    </ol>
+
+    <div class="panel">
+      <h3 style="margin-top:0">What you get</h3>
+      <div class="tw" tabindex="0">
+        <table>
+          <caption>Everything Ficus adds, and where it lives.</caption>
+          <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>/carbon</code></th><td>The footprint report in your terminal — totals, by model family, offset balance.</td></tr>
+            <tr><th scope="row"><code>/carbon-review</code></th><td>The same figures with familiar-scale comparisons and the reasoning behind each one.</td></tr>
+            <tr><th scope="row"><code>/carbon-offset</code></th><td>Records a purchase or donation against a receipt, and exports a tax-year CSV.</td></tr>
+            <tr><th scope="row"><code>generate-dashboard.sh</code></th><td>Builds the single-file HTML statement — the one linked at the top of this page.</td></tr>
+            <tr><th scope="row"><code>~/.claude/carbon-ledger/</code></th><td>The database, the constants cache, your receipts and exports. Nothing leaves it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ SOURCES ============================ -->
+  <section id="sources">
+    <span class="eyebrow">Provenance</span>
+    <h2>Where the data comes from</h2>
+    <p class="sub">Two different kinds of input, and it matters which is which: your token counts are
+      <em>measured</em> and come off your own disk, while every factor that turns a token into a gram
+      is <em>published by someone else</em> and carries its citation.</p>
+    <div class="hr"></div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3 style="margin-top:0">Your usage — measured, local</h3>
+        <p class="note">Claude Code writes a JSONL transcript for every session. Ficus reads the token
+          counts out of those files: input, output, cache-creation and cache-read, per model. Nothing
+          is sampled and nothing is inferred.</p>
+        <ul class="tight">
+          <li><strong>Deduplicated</strong> by message and request id, so a resumed session is not counted twice.</li>
+          <li><strong>Non-Claude models are excluded</strong>, not guessed at. A local model behind a custom base URL records zero rather than a fabricated estimate.</li>
+          <li><strong>Never uploaded.</strong> The dashboard is a single offline HTML file with no network calls in it at all — the test suite fails the build if a loadable external reference appears.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">The factors — published, cited</h3>
+        <p class="note">Per-model emission factors come from Jegham et al. 2025
+          (<a href="https://arxiv.org/abs/2505.09598">arXiv:2505.09598</a>), the most complete public
+          accounting available. Sonnet is fitted to three published per-query energies; Opus, Haiku and
+          Fable are extrapolated from it — so Fable carries a double extrapolation, which is a large
+          part of why the ±50% band exists.</p>
+        <p class="note">Every result is cross-checked against
+          <a href="https://ecologits.ai">EcoLogits</a>, an independent peer-reviewed model
+          (JOSS <span class="n">10.21105/joss.07471</span>). The two methodologies diverge by about
+          1.05×; the build fails if they ever diverge by more than 3×.</p>
+      </div>
+    </div>
+
+    <h3>The constants, and who measured them</h3>
+    <p class="note">These are the exact values in <code>data/factors.json</code> as this page was
+      built. Each one carries a <code>_source</code> field naming the publication and the date it was
+      recorded, and this table is generated from that file rather than typed out here.</p>
+    <div class="tw" tabindex="0">
+      <table>
+        <caption>Physical constants used to derive electricity, water and embodied carbon.</caption>
+        <thead><tr><th>Constant</th><th class="n">Value</th><th>Source</th></tr></thead>
+        <tbody>
+<!--{{CONSTANTS}}-->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================= MATHS ============================= -->
+  <section id="maths">
+    <span class="eyebrow">Method</span>
+    <h2>How each figure is calculated</h2>
+    <p class="sub">Four numbers, one chain. Carbon is estimated from tokens; everything else is
+      derived from carbon by a fixed published factor — which is why the three lines on the dashboard
+      chart always move together.</p>
+    <div class="hr"></div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">1 · Carbon, from tokens</h3>
+      <p class="note">Deduplicated token counts multiplied by per-model factors in grams of CO2e per
+        million tokens. A cache-read token is charged a fraction of a fresh input token, because it
+        skips the prefill:</p>
+      <p class="formula">{{F_CO2}}</p>
+      <p class="note">Cache-read factor: <span class="n">{{CACHE_READ}}</span>. This is the only step
+        that is a model rather than an identity — everything below follows from it arithmetically.</p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">2 · Electricity, by identity</h3>
+      <p class="note">Not a second model. The published CO2e factors <em>are</em> facility energy
+        multiplied by a grid carbon-intensity figure, so dividing by that same figure recovers the
+        energy exactly:</p>
+      <p class="formula">{{F_ENERGY}}</p>
+      <p class="note">Grid carbon intensity: <span class="n">{{CIF}}</span> g/Wh. Because this is an
+        exact identity rather than an independent measurement, <strong>electricity is deliberately
+        never given a price</strong> on the dashboard — the kilowatt-hours and the carbon are one
+        quantity in two units, and charging for both would bill the same externality twice.</p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">3 · Water, two terms kept PUE-consistent</h3>
+      <p class="note">On-site cooling water applies to IT energy — facility energy divided by PUE —
+        while off-site generation water applies to the full facility energy:</p>
+      <p class="formula">{{F_WATER}}</p>
+      <p class="note">PUE <span class="n">{{PUE}}</span>, on-site WUE <span class="n">{{WUE_ON}}</span> L/kWh,
+        off-site WUE <span class="n">{{WUE_OFF}}</span> L/kWh. The off-site figure is the largest single
+        source of uncertainty in the whole chain and sits at the high end of published estimates.</p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">4 · Embodied carbon, reported apart</h3>
+      <p class="note">The amortised share of manufacturing the hardware, at
+        <span class="n">{{EMB}}</span> gCO2e/kWh:</p>
+      <p class="formula">{{F_EMBODIED}}</p>
+      <p class="note">It is <strong>never folded into the operational figure</strong> and never enters
+        what you owe. It is a real cost with a different owner, so it gets its own line.</p>
+    </div>
+
+    <h3>What a dollar is being asked to buy</h3>
+    <p class="note">The balance is priced at <strong>${{REMOVAL_RATE}} per tonne</strong>, the retail
+      price of ex-post biochar removal certificates from the vendor this project actually links to.
+      Three rules keep that figure honest:</p>
+    <ul class="tight">
+      <li><strong>Ex-post only.</strong> A dollar buys carbon already verifiably removed or destroyed, never a promise to remove it later.</li>
+      <li><strong>Only verified removal settles the balance.</strong> Prevention credits (${{PREVENTION_RATE}}/t) are real and worth buying, but they stop a future emission rather than reversing a past one, so they are reported below the line and never subtracted from the tonnes owed.</li>
+      <li><strong>No uncertainty multipliers.</strong> The price is what the vendor charges, with no risk factor bolted on — an upward-pointing error is still an error.</li>
+    </ul>
+    <p class="note">Water gets a <em>restoration match</em> rather than an offset: water is
+      basin-local and a gallon returned to one stream does not repay a gallon drawn from another. It
+      is a contribution, it is labelled as one, and it never touches the carbon balance.</p>
+    <p class="note">Full derivations, including every rejected alternative, are in
+      <a href="https://github.com/Magonia-Research/ficus/blob/main/METHODOLOGY.md">METHODOLOGY.md</a>.</p>
+  </section>
+
+  <!-- ============================ GIVING ============================= -->
+  <section id="giving">
+    <span class="eyebrow">Research</span>
+    <h2>Where the money can go, and what those organisations actually do</h2>
+    <p class="sub">A shortlist of seven, one per ecosystem, each researched rather than recommended.
+      Every sentence below is generated from <code>data/giving-shortlist.json</code>, which records
+      the research document each claim came from — including the two entries whose honest verdict is
+      that they do not offset anything.</p>
+    <div class="hr"></div>
+<!--{{ORGS}}-->
+    <div class="panel">
+      <p class="note" style="margin:0"><strong>Ficus takes no cut and has no affiliate relationship
+        with any organisation on this page.</strong> The links are plain links. Nothing is bundled,
+        nothing is resold, and the tool never initiates a payment — you buy directly from the
+        organisation and then record the receipt yourself.</p>
+    </div>
+  </section>
+
+  <!-- ============================ EXAMPLE ============================ -->
+  <section id="example">
+    <span class="eyebrow">See it</span>
+    <h2>The example dashboard</h2>
+    <p class="sub">A complete statement rendered by the real generator from fabricated data: five
+      months of invented sessions, two invented purchases and one invented donation. Everything you
+      would see on your own, with none of anyone's actual usage in it.</p>
+    <div class="hr"></div>
+    <div class="cta" style="margin-top:0">
+      <a class="btn btn--go" href="dashboard.html">Open the example dashboard →</a>
+      <small>One HTML file, no network calls. Save it and it still works.</small>
+    </div>
+    <figure class="shot">
+      <a href="dashboard.html"><img src="dashboard.png" alt="The Ficus dashboard: lifetime carbon, electricity and water totals across three cards, above a three-lane time-series chart of daily usage grouped by month."></a>
+      <figcaption>The dashboard groups usage by month but draws every individual day, ruling each
+        month boundary — a month total hides whether it came from one heavy Tuesday or thirty steady
+        ones.</figcaption>
+    </figure>
+  </section>
+
+</main>
+
+<!-- OUTSIDE <main> on purpose. A <footer> that is a descendant of main maps to
+     role=generic rather than role=contentinfo, so a screen-reader user
+     navigating by landmark would never find the licence, the methodology or the
+     third-party notices. -->
+  <footer class="wrap">
+    <p><strong>Ficus</strong> — MIT licensed, a fork of
+      <a href="https://github.com/gwittebolle/claude-carbon">claude-carbon</a> by Guillaume Wittebolle,
+      with the estimation, offset ledger, statusline and dashboard rebuilt on cited constants.</p>
+    <p>Every figure on the linked dashboard is an estimate carrying the ±50% band described above.
+      Nothing here is financial, tax or legal advice.</p>
+    <p class="note">Page built {{GENERATED}} from the repository's own data files.
+      <a href="https://github.com/Magonia-Research/ficus">Source</a> ·
+      <a href="https://github.com/Magonia-Research/ficus/blob/main/METHODOLOGY.md">Methodology</a> ·
+      <a href="https://github.com/Magonia-Research/ficus/blob/main/NOTICE.md">Third-party notices</a></p>
+  </footer>
+</body>
+</html>

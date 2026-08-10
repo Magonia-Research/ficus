@@ -1,0 +1,2 @@
+{"type":"user","cwd":"/Users/test/projects/fixture-alpha","timestamp":"2026-08-02T09:00:00.000Z"}
+{"type":"assistant","timestamp":"2026-08-02T09:00:10.000Z","requestId":"req_101","message":{"id":"msg_101","model":"claude-fable-5","usage":{"input_tokens":1000,"cache_creation_input_tokens":500,"cache_read_input_tokens":2000,"output_tokens":800}}}

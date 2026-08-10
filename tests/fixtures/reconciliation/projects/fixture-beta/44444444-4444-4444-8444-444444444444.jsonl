@@ -1,0 +1,4 @@
+{"type":"user","cwd":"/Users/test/projects/fixture-beta","timestamp":"2026-08-04T08:00:00.000Z"}
+{"type":"assistant","timestamp":"2026-08-04T08:00:15.000Z","requestId":"req_401","message":{"id":"msg_401","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":600,"cache_creation_input_tokens":50,"cache_read_input_tokens":0,"output_tokens":250}}}
+{"type":"assistant","message":
+{"type":"assistant","timestamp":"2026-08-04T08:01:30.000Z","requestId":"req_402","message":{"id":"msg_402","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":150,"cache_creation_input_tokens":0,"cache_read_input_tokens":800,"output_tokens":90}}}
