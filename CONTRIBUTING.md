@@ -122,14 +122,16 @@ Fix warnings rather than suppressing them. If a suppression is genuinely
 required, put the justification on the line above it. New scripts open with
 `set -euo pipefail`, and `export LC_ALL=C` when they do any numeric formatting.
 
-Install the pre-commit hook once:
+Run the suite before you commit:
 
 ```bash
-git config core.hooksPath .githooks
+bash tests/run-tests.sh
 ```
 
-It runs `tests/run-lint.sh` and `tests/run-vectors.sh` before every commit, or
-defers to `prek run` when prek is installed.
+**There is no commit hook, deliberately.** A hook here could only ever run a
+subset of that command, which means two entry points that agree until the day
+they do not, and a check you cannot see the output of until it blocks you. One
+command, run when you choose, is the whole contract.
 
 ## Things that are never done
 
