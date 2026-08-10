@@ -64,7 +64,7 @@ fi
 # lifetime dollar pair, which put a figure about the last twenty minutes inside
 # a row about every session ever recorded — two different denominators reading
 # as one line. It now rides with the ⚡/💧/💨 it was computed from.
-printf '%s · ▲ %s session\n' "$SEG" "$SESS_COST"
+printf '%s · ▲ %s\n' "$SEG" "$SESS_COST"
 printf '────────────────────────────────\n'
 TOTALS="$ALL"
 [ -n "$BAL" ] && TOTALS="${TOTALS:+${TOTALS} · }${BAL}"

@@ -121,7 +121,7 @@ check_vector() {
   # SESSION FIGURES ABOVE THE RULE, TOTALS BELOW IT. The session cost sits with
   # the session readings it was computed from; the totals line carries only
   # all-time figures.
-  want="$(printf '%s · ▲ %s session\n%s\n∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t · 💨 0.00t/0.62t · $99.79/99.79 total' \
+  want="$(printf '%s · ▲ %s\n%s\n∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t · 💨 0.00t/0.62t · $99.79/99.79 total' \
     "$exp_fmt" "$exp_cost" "$SEP_LINE")"
   if [ "$got" = "$want" ]; then
     echo "PASS statusline math: ${vid}"

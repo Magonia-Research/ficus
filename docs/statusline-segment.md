@@ -1,20 +1,19 @@
 # Statusline segment integration
 
 The carbon segment renders as a right-hand column beside the existing
-statusline rows — a `Totals:` label on its own row above the column, cached
-all-time totals beside the header, offset totals beside the context line, and
-the session's own figures on their own row at the bottom (directly above Claude
-Code's mode line):
+statusline rows — cached all-time totals beside the model row, offset totals
+beside the context line, and the session's own figures on their own row at the
+bottom (directly above Claude Code's mode line):
 
 ```
-                                    Totals:
 [Fable 5] 📁 repo │ 🌿 main          │ ∑ ⚡ 2173.2kWh 💧 11448L 💨 0.62t
 ████ 10% │ $8.08 │ ⏱ 2h 17m  ↻99%   │ 💨 0.00t/0.62t · $99.82/99.82 total
-⚡ 0.42Wh 💧 2.2mL 💨 0.12g · ▲ 0.03¢ session
+⚡ 0.42Wh 💧 2.2mL 💨 0.12g · ▲ 0.03¢
 ```
 
-(The label row must open with an ANSI escape — Claude Code's renderer trims
-leading whitespace, and the escape stops the trim so the padding survives.)
+**The column carries no header row.** A `Totals:` label above it cost a full
+blank line across the left half of the statusline to say what the `∑` prefix
+and the trailing `total` already say. Three rows, no gap.
 
 **Session figures sit with the session, totals with the totals.** The bottom row
 is everything about the conversation in front of you: its energy, water and CO2e
