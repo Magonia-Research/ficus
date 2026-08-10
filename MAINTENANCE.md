@@ -124,5 +124,5 @@ physics-db (3 write paths), offsets (33 assertions), cross-check (+ mutation),
 statusline bench (p95 < 50 ms), dashboard (determinism + zero external refs),
 hygiene (no network call sites, no legacy naming), lint (shellcheck all,
 shfmt on fork-added files; containerized when not installed locally).
-Pre-commit hook (`.githooks/`, `core.hooksPath`) runs lint + vectors; prek
-config is present for when prek is installed.
+No commit hook and no prek config: `tests/run-tests.sh` is the only entry point,
+so there is no second, quieter subset of it to drift out of step.
